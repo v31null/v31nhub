@@ -29,6 +29,7 @@ const web = u => typeof u === "string" && /^https:\/\/[^/]+/i.test(u);
 
 const hubs = () =>
   (Array.isArray(list().hub) ? list().hub : [])
+    .map(h => (process.platform === "linux" ? h && h.linux && { ...h.linux, role: h.role } : h))
     .filter(h => h && web(h.url) && web(h.exe) && Object.hasOwn(RANK, h.role))
     .map((h, i) => ({ url: h.url, exe: h.exe, role: h.role, i }))
     .sort((a, b) => RANK[a.role] - RANK[b.role] || a.i - b.i)

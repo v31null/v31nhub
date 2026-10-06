@@ -1,3 +1,4 @@
+const fs = require("fs");
 const os = require("os");
 const { execFile } = require("child_process");
 
@@ -15,7 +16,20 @@ const ticks = () =>
     { idle: 0, all: 0 }
   );
 
-const bytes = () =>
+const proc = () => {
+  try {
+    const rows = fs
+      .readFileSync("/proc/net/dev", "utf8")
+      .split("\n")
+      .map(l => l.trim().match(/^([^:]+):\s*(\d+)(?:\s+\d+){7}\s+(\d+)/))
+      .filter(m => m && m[1] !== "lo");
+    return { rx: rows.reduce((n, m) => n + Number(m[2]), 0), tx: rows.reduce((n, m) => n + Number(m[3]), 0), at: Date.now() };
+  } catch (e) {
+    return null;
+  }
+};
+
+const netstat = () =>
   new Promise(res =>
     execFile("netstat", ["-e"], { windowsHide: true, timeout: 2000 }, (e, out) => {
       if (e) return res(null);
@@ -26,6 +40,8 @@ const bytes = () =>
       res(row ? { rx: Number(row[1]), tx: Number(row[2]), at: Date.now() } : null);
     })
   );
+
+const bytes = async () => (process.platform === "linux" ? proc() : netstat());
 
 const sample = async () => {
   const t = ticks();

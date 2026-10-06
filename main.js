@@ -10,6 +10,8 @@ const UI = path.join(__dirname, "ui");
 const argv = process.argv;
 const mode = !app.isPackaged ? "run" : argv.includes("--remove-hub") ? "remove" : self.portable() ? "setup" : "run";
 
+if (process.platform === "linux") app.commandLine.appendSwitch("no-sandbox");
+
 protocol.registerSchemesAsPrivileged([{ scheme: "hub", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 if (mode === "run" && !app.requestSingleInstanceLock()) {
@@ -37,7 +39,7 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
       maximizable: false,
       fullscreenable: false,
       show: false,
-      icon: path.join(__dirname, "build", "icon.ico"),
+      icon: path.join(__dirname, "build", process.platform === "linux" ? "icon.png" : "icon.ico"),
       webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, sandbox: true }
     });
     w.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

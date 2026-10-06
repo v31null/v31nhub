@@ -609,6 +609,7 @@ body { display: flex; align-items: center; justify-content: center; }
     "brand": "PRONO",
     "build": "BUILD",
     "platform": "WIN · X64",
+    "platform_linux": "LINUX · X64",
     "caution": "AUTHORISED DEPLOYMENT",
     "update": "UPDATE EXISTS",
     "uptodate": "UP TO DATE",
@@ -716,6 +717,7 @@ body { display: flex; align-items: center; justify-content: center; }
         return `<svg width="${x}" height="${h}" viewBox="0 0 ${x} ${h}">${bars}</svg>`;
     };
 
+    if (H && H.platform === 'linux') L.platform = L.platform_linux;
     document.querySelectorAll('[data-k]').forEach(n => n.textContent = L[n.dataset.k]);
     const fill = () => {
     const strip = `${L.brand} // ${D.date} ${D.version} // ${D.sha.toUpperCase()} // `;

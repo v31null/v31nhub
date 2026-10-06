@@ -6,7 +6,8 @@ const { once } = require("events");
 const { spawn, execFile } = require("child_process");
 const { app, shell } = require("electron");
 
-const NAME = "V31null Hub.exe";
+const LINUX = process.platform === "linux";
+const NAME = LINUX ? "V31null Hub.AppImage" : "V31null Hub.exe";
 const { GATE, WAIT, hubs } = require("./net.js");
 const KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\V31null Hub";
 const PRONO = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Prono";
@@ -144,6 +145,20 @@ const check = async () => {
   return { hub: best.h, from: [...new Set([best.m.exe, ...all.map(m => m.exe)])] };
 };
 
+const swap = async file => {
+  const at = process.env.APPIMAGE;
+  const stage = `${at}.new`;
+  try {
+    await fsp.copyFile(file, stage);
+    await fsp.chmod(stage, 0o755);
+    await fsp.rename(stage, at);
+    return at;
+  } catch (e) {
+    await fsp.rm(stage, { force: true }).catch(() => {});
+    return null;
+  }
+};
+
 const update = async ({ fresh, argv }) => {
   if (!fresh) return false;
   const h = fresh.hub;
@@ -151,7 +166,8 @@ const update = async ({ fresh, argv }) => {
   const tried = argv.map(a => a.match(/^--updated=(.+)$/)).find(Boolean);
   if (tried && cmp(tried[1], current) > 0) return false;
   if (!valid(h) || cmp(h.version, current) <= 0) return false;
-  const next = path.join(downloads(), `V31null Hub ${h.version}.exe`);
+  if (LINUX && !process.env.APPIMAGE) return false;
+  const next = path.join(downloads(), `V31null Hub ${h.version}${path.extname(NAME)}`);
   for (const url of fresh.from) {
     try {
       await fsp.mkdir(downloads(), { recursive: true });
@@ -174,7 +190,9 @@ const update = async ({ fresh, argv }) => {
       await fsp.rm(next, { force: true }).catch(() => {});
       continue;
     }
-    spawn(next, [...flags(argv).filter(a => !a.startsWith("--updated=")), `--updated=${h.version}`], { detached: true, stdio: "ignore", env: clean() }).unref();
+    const exe = LINUX ? await swap(next) : next;
+    if (!exe) return false;
+    spawn(exe, [...flags(argv).filter(a => !a.startsWith("--updated=")), `--updated=${h.version}`], { detached: true, stdio: "ignore", env: clean() }).unref();
     return true;
   }
   return false;

@@ -29,11 +29,18 @@
       "sys.js",
       "net.json",
       "ui/**",
-      "build/icon.ico"
+      "build/icon.ico",
+      "build/icon.png"
     ],
     "win": {
       "target": "portable",
       "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "artifactName": "V31null Hub.AppImage"
     },
     "portable": {
       "artifactName": "V31null Hub.exe"

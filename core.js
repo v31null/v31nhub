@@ -9,8 +9,11 @@ const { app, shell, dialog, ipcMain } = require("electron");
 const self = require("./self.js");
 const { GATE, needs } = require("./net.js");
 
+const LINUX = process.platform === "linux";
 const REG = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Prono";
-const EXE = "Prono.exe";
+const EXE = LINUX ? "prono-desktop" : "Prono.exe";
+const MANIFEST = LINUX ? "manifest-linux.json" : "manifest.json";
+const SHARE = () => process.env.XDG_DATA_HOME || path.join(app.getPath("home"), ".local", "share");
 const HIVES = [
   "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
   "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
@@ -70,13 +73,23 @@ const retry = async (fn, tries = 10, wait = 300) => {
   }
 };
 
+const listed = () => {
+  try {
+    const s = JSON.parse(fs.readFileSync(path.join(app.getPath("userData"), "state.json"), "utf8"));
+    return { DisplayVersion: s.installed, InstallLocation: s.path };
+  } catch (e) {
+    return {};
+  }
+};
+
 const own = async () => {
-  const v = values(await read("reg.exe", ["query", REG]));
+  const v = LINUX ? listed() : values(await read("reg.exe", ["query", REG]));
   if (!v.DisplayVersion || !v.InstallLocation || !fs.existsSync(path.join(v.InstallLocation, EXE))) return null;
   return { version: v.DisplayVersion, path: v.InstallLocation };
 };
 
 const legacy = async () => {
+  if (LINUX) return null;
   const found = [];
   for (const hive of HIVES) {
     const keys = (await read("reg.exe", ["query", hive, "/s", "/f", "Prono", "/d"])).split(/\r?\n/).filter(l => l.startsWith("HKEY_"));
@@ -100,12 +113,16 @@ const elevate = (exe, args) => {
   return new Promise(res => execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", cmd], { windowsHide: true }, e => res(!e)));
 };
 
-const running = async () => /Prono\.exe/i.test(await read("tasklist.exe", ["/FI", `IMAGENAME eq ${EXE}`, "/NH"]));
+const mineOnly = () => ["-x", "-u", String(process.getuid()), EXE];
+
+const running = async () =>
+  LINUX ? /\d/.test(await read("pgrep", mineOnly())) : /Prono\.exe/i.test(await read("tasklist.exe", ["/FI", `IMAGENAME eq ${EXE}`, "/NH"]));
 
 const closeProno = async () => {
   if (!(await running())) return true;
   for (const force of [false, true]) {
-    await read("taskkill.exe", ["/IM", EXE, "/T", ...(force ? ["/F"] : [])]);
+    if (LINUX) await read("pkill", [...(force ? ["-KILL"] : []), ...mineOnly()]);
+    else await read("taskkill.exe", ["/IM", EXE, "/T", ...(force ? ["/F"] : [])]);
     for (let i = 0; i < 12; i++) {
       if (!(await running())) {
         await sleep(400);
@@ -130,10 +147,10 @@ module.exports = function core({ win, mirrors, offline, argv }) {
   let bases = mirrors;
   const stateFile = path.join(app.getPath("userData"), "state.json");
   const tempDir = path.join(app.getPath("temp"), "PronoHub");
-  const startMenu = path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", "Prono.lnk");
-  const desktop = path.join(app.getPath("desktop"), "Prono.lnk");
+  const startMenu = LINUX ? path.join(SHARE(), "applications", "prono.desktop") : path.join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", "Prono.lnk");
+  const desktop = LINUX ? null : path.join(app.getPath("desktop"), "Prono.lnk");
   const data = path.join(app.getPath("appData"), "prono-desktop");
-  const defaultDir = path.join(process.env.LOCALAPPDATA || app.getPath("appData"), "Programs", "Prono");
+  const defaultDir = LINUX ? path.join(SHARE(), "Prono") : path.join(process.env.LOCALAPPDATA || app.getPath("appData"), "Programs", "Prono");
 
   const readState = () => {
     try {
@@ -179,7 +196,7 @@ module.exports = function core({ win, mirrors, offline, argv }) {
     if (!offline) {
       for (const base of mirrors) {
         try {
-          const res = await fetch(`${base}/app/manifest.json`, { cache: "no-store", headers: GATE, signal: AbortSignal.timeout(8000) });
+          const res = await fetch(`${base}/app/${MANIFEST}`, { cache: "no-store", headers: GATE, signal: AbortSignal.timeout(8000) });
           if (!res.ok) throw new Error("http");
           const m = await res.json();
           if (!valid(m)) throw new Error("manifest");
@@ -330,7 +347,18 @@ module.exports = function core({ win, mirrors, offline, argv }) {
     send("hub:progress", { phase: "extract", frac: 1, speed: 0 });
   };
 
+  const entry = async (m, dir) => {
+    const exe = path.join(dir, EXE);
+    const lines = ["[Desktop Entry]", "Type=Application", "Name=Prono", `Exec="${exe}"`, `Icon=${path.join(dir, "icon.png")}`, "Terminal=false", ""];
+    await fsp.mkdir(path.dirname(startMenu), { recursive: true });
+    await fsp.writeFile(startMenu, lines.join("\n"), "utf8");
+    send("hub:progress", { phase: "link", frac: 0.5, speed: 0 });
+    writeState({ ...readState(), installed: m.version, path: dir, manifest: m });
+    send("hub:progress", { phase: "link", frac: 1, speed: 0 });
+  };
+
   const link = async (m, dir) => {
+    if (LINUX) return entry(m, dir);
     const exe = path.join(dir, EXE);
     const spec = { target: exe, cwd: dir, icon: exe, iconIndex: 0 };
     fs.mkdirSync(path.dirname(startMenu), { recursive: true });
@@ -454,8 +482,10 @@ module.exports = function core({ win, mirrors, offline, argv }) {
     }
     await plain(() => fsp.rm(gone, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 })).catch(() => {});
     await fsp.rm(startMenu, { force: true });
-    await fsp.rm(desktop, { force: true });
-    await run("reg.exe", ["delete", REG, "/f"]).catch(() => {});
+    if (!LINUX) {
+      await fsp.rm(desktop, { force: true });
+      await run("reg.exe", ["delete", REG, "/f"]).catch(() => {});
+    }
     const { installed, ...rest } = readState();
     writeState(rest);
     return { ok: true };

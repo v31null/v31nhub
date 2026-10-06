@@ -3,7 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 const listen = channel => cb => ipcRenderer.on(channel, (e, m) => cb(m));
 
 contextBridge.exposeInMainWorld("hub", {
-  info: () => ipcRenderer.invoke("hub:info"),
+  platform: process.platform,
+  info:() => ipcRenderer.invoke("hub:info"),
   start: () => ipcRenderer.invoke("hub:start"),
   pause: () => ipcRenderer.invoke("hub:pause"),
   resume: () => ipcRenderer.invoke("hub:resume"),
