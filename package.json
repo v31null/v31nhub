@@ -1,0 +1,42 @@
+{
+  "name": "v31hub",
+  "version": "1.1.0",
+  "private": true,
+  "description": "V31null hub",
+  "author": "v31null",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "extract-zip": "^2.0.1"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "pr.com.v31null.hub",
+    "productName": "V31null Hub",
+    "files": [
+      "main.js",
+      "preload.js",
+      "core.js",
+      "self.js",
+      "net.js",
+      "sys.js",
+      "net.json",
+      "ui/**",
+      "build/icon.ico"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "V31null Hub.exe"
+    }
+  }
+}

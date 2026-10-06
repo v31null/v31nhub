@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prono</title>
+<link rel="stylesheet" href="/css/dark_variables.css">
+<style>
+html, body { margin: 0; height: 100%; background: var(--bg-base); }
+body { display: flex; align-items: center; justify-content: center; }
+#offline { --ar: var(--text-primary); --gr: var(--text-muted); --sa: #000; --disp: 'Bahnschrift', 'DIN Alternate', 'Arial Narrow', sans-serif; --cond: 'Bahnschrift Condensed', 'Bahnschrift', 'Arial Narrow', sans-serif; --ease: cubic-bezier(.55, 0, .1, 1); --out: cubic-bezier(.23, 1, .32, 1); --ok: var(--status-online); --warn: var(--status-away); --dead: var(--status-dnd); display: flex; width: 900px; height: 280px; background: var(--bg-surface); border-radius: var(--radius-xl); overflow: hidden; font-family: var(--disp); color: var(--ar); user-select: none; cursor: default; }
+#stage { position: relative; flex: 1; display: flex; overflow: hidden; background: var(--bg-base); }
+#bar { display: flex; flex-direction: column; align-items: center; box-sizing: border-box; width: 90px; padding: 10px; background: var(--sa); }
+#arms { display: block; width: 70px; height: auto; animation: rise .8s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes rise {
+    from { opacity: 0; transform: translateY(50%); }
+    to { opacity: 1; transform: none; }
+}
+
+#art { --amber: var(--status-away); --ink: color-mix(in srgb, var(--bg-surface) 50%, var(--bg-base)); --off: color-mix(in srgb, var(--bg-overlay) 70%, var(--bg-base)); position: relative; flex: 1; display: flex; overflow: hidden; }
+
+#rail { position: relative; z-index: 1; flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px; box-sizing: border-box; width: 44px; padding: 14px 0 16px; background: var(--sa); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%); animation: slide .7s var(--out) both; }
+#rail::before, #rail::after { content: ""; position: absolute; left: 5px; right: 7px; height: 4px; background: radial-gradient(circle at 2px 2px, var(--bg-overlay) 1.6px, transparent 2px), radial-gradient(circle at calc(100% - 2px) 2px, var(--bg-overlay) 1.6px, transparent 2px); }
+#rail::before { top: 4px; }
+#rail::after { bottom: 4px; right: 16px; }
+#rail .tear { position: absolute; top: 0; bottom: 12px; right: 0; width: 1px; background: repeating-linear-gradient(180deg, var(--border-default) 0 3px, transparent 3px 7px); }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: none; } }
+.cnt { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cnt b { font: 700 17px/1 var(--cond); letter-spacing: .02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cnt b em { font-style: normal; color: var(--text-faint); }
+.cnt span { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 8px var(--disp); letter-spacing: .32em; color: var(--text-muted); }
+#meter { flex: 1; display: flex; flex-direction: column-reverse; justify-content: flex-start; gap: 3px; box-sizing: border-box; width: 22px; min-height: 0; padding-left: 7px; background: repeating-linear-gradient(0deg, var(--text-faint) 0 1px, transparent 1px 5px) 0 0 / 3px 100% no-repeat; }
+#meter i { flex: 0 1 8px; min-height: 2px; background: var(--bg-overlay); transform: skewY(-20deg); transition: background .4s; }
+#meter i.on { background: var(--ok); }
+#meter i.hit { background: var(--warn); }
+
+#board { --t: 10px; --th: 16px; --fd: 35ms; position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 12px 16px 0 14px; background: var(--ink); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
+.frame { position: absolute; inset: 4px 6px 4px 4px; pointer-events: none; background: linear-gradient(var(--border-default), var(--border-default)) 0 0 / 1px 34px no-repeat, linear-gradient(var(--border-default), var(--border-default)) 0 0 / 46px 1px no-repeat, linear-gradient(var(--amber), var(--amber)) 50px 0 / 12px 1px no-repeat, linear-gradient(var(--border-default), var(--border-default)) 100% 100% / 1px 30px no-repeat, linear-gradient(var(--border-default), var(--border-default)) 100% 100% / 90px 1px no-repeat, linear-gradient(var(--amber), var(--amber)) calc(100% - 94px) 100% / 6px 1px no-repeat; }
+.frame::before, .frame::after { content: ""; position: absolute; width: 5px; height: 5px; transform: rotate(45deg); }
+.frame::before { left: -2px; top: 35px; background: var(--amber); }
+.frame::after { right: -2px; bottom: 31px; background: var(--text-muted); }
+.reg { position: absolute; width: 9px; height: 9px; pointer-events: none; background: linear-gradient(var(--text-faint), var(--text-faint)) 4px 0 / 1px 100% no-repeat, linear-gradient(var(--text-faint), var(--text-faint)) 0 4px / 100% 1px no-repeat; }
+
+.flaps { display: inline-flex; gap: 1px; }
+.flaps i { --top: color-mix(in srgb, var(--bg-elevated), #fff 3%); --bot: color-mix(in srgb, var(--bg-surface), #000 25%); position: relative; display: block; width: var(--t); height: var(--th); border-radius: 2px; box-shadow: 0 1px 0 #000, 0 2px 3px rgba(0, 0, 0, .45); font: 600 calc(var(--th) * .64)/var(--th) var(--disp); font-style: normal; text-align: center; white-space: pre; color: inherit; perspective: calc(var(--th) * 4); }
+.flaps i::after { content: ""; position: absolute; z-index: 2; left: 0; right: 0; top: calc(50% - .5px); height: 1px; background: var(--sa); }
+.flaps i > span { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; backface-visibility: hidden; }
+.flaps i > span > span { display: block; height: var(--th); }
+.flaps .u, .flaps .fu { top: 0; border-radius: 2px 2px 0 0; background: var(--top); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), inset 1px 0 rgba(0, 0, 0, .6), inset -1px 0 rgba(0, 0, 0, .6); transform-origin: 50% 100%; }
+.flaps .l, .flaps .fl { bottom: 0; border-radius: 0 0 2px 2px; background: var(--bot); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .6), inset 1px 0 rgba(0, 0, 0, .6), inset -1px 0 rgba(0, 0, 0, .6); transform-origin: 50% 0; }
+.flaps .l > span, .flaps .fl > span { margin-top: calc(var(--th) / -2); }
+.flaps .fu, .flaps .fl { z-index: 1; }
+.flaps .fu { opacity: 0; transform: rotateX(-90deg); }
+.flaps i.go .fu { animation: fall var(--fd) ease-in both; }
+.flaps i.go .fl { animation: land var(--fd) var(--fd) ease-out both; }
+@keyframes fall {
+    from { opacity: 1; transform: none; filter: none; }
+    99% { opacity: 1; }
+    to { opacity: 0; transform: rotateX(-90deg); filter: brightness(.4); }
+}
+@keyframes land {
+    from { transform: rotateX(90deg); filter: brightness(1.5); }
+    to { transform: none; filter: none; }
+}
+.flaps i.sep { width: calc(var(--t) * .45); box-shadow: none; }
+.flaps i.sep::after { display: none; }
+
+.dot { --c: var(--off); position: relative; width: 3px; height: 3px; transform: perspective(12px) rotateY(0); transform-style: preserve-3d; transition: transform .22s ease-in-out; transition-delay: calc(var(--i, 0) * 14ms); }
+.dot::before, .dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; backface-visibility: hidden; }
+.dot::before { background: var(--off); }
+.dot::after { background: var(--c); transform: rotateY(180deg); }
+.dot.on { transform: perspective(12px) rotateY(180deg); }
+.hist { display: grid; grid-template-columns: repeat(12, 3px); gap: 1px; align-items: center; }
+.lat { display: grid; grid-template-columns: repeat(10, 3px); grid-template-rows: repeat(4, 3px); grid-auto-flow: column; gap: 1px; align-content: center; }
+
+#head { display: flex; align-items: center; justify-content: space-between; }
+#slab { position: relative; display: inline-flex; padding: 4px 14px 4px 12px; }
+#slab::before, #slab::after { content: ""; position: absolute; inset: 0; clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%); }
+#slab::before { background: color-mix(in srgb, var(--amber) 22%, transparent); transform: translate(5px, 5px); }
+#slab::after { background: var(--amber); }
+#title { --t: 17px; --th: 26px; position: relative; z-index: 1; color: var(--amber); }
+#clock { --t: 15px; --th: 26px; display: flex; align-items: flex-end; gap: 5px; }
+#clock b, #last b { font: 600 10px/1 var(--disp); letter-spacing: .12em; color: var(--gr); }
+#sub { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-bottom: 7px; border-bottom: 1px solid var(--border-subtle); font: 9px var(--font-mono); letter-spacing: .14em; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
+#sub span + span { padding-left: 8px; border-left: 1px solid var(--text-faint); }
+#sub [data-k="zone"] { color: var(--amber); }
+#next { position: relative; flex: 1; height: 3px; margin-left: 10px; background: repeating-linear-gradient(90deg, var(--border-default) 0 1px, transparent 1px 6px); }
+#next::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(100% * var(--n, 0)); background: var(--ar); }
+#next::before { content: ""; position: absolute; right: -1px; top: -3px; width: 1px; height: 9px; background: var(--amber); }
+.busy #next::after { width: 100%; background: repeating-linear-gradient(90deg, var(--amber) 0 6px, transparent 6px 12px) 0 0 / 12px 100%; animation: march .5s linear infinite; }
+@keyframes march { to { background-position: 12px 0; } }
+
+.grid { display: grid; grid-template-columns: 8px calc(var(--svc) * (var(--t) + 1px)) minmax(0, 1fr) calc(3 * (var(--t) + 1px)) 47px 39px calc(4 * (var(--t) + 1px)) calc(11 * (var(--t) + 1px)); column-gap: 6px; align-items: center; }
+#cols { margin: 6px 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--border-subtle); font: 600 8px/9px var(--disp); letter-spacing: .2em; color: var(--text-faint); }
+#cols span { position: relative; min-height: 9px; padding-left: 4px; white-space: nowrap; overflow: hidden; border-left: 1px solid var(--border-default); }
+#cols span:first-child { border: 0; padding: 0; }
+#cols span:nth-child(2) { color: var(--text-muted); }
+#cols span:nth-child(7) { text-align: right; }
+#rows { display: flex; flex-direction: column; gap: 3px; }
+.row { position: relative; color: var(--text-secondary); }
+.row .lamp { width: 8px; height: 8px; transition-delay: 0s; }
+.row .st { color: var(--st, var(--text-faint)); }
+.row .slot { position: relative; height: var(--th); padding: 0 6px; overflow: hidden; background: var(--sa); border-radius: 2px; font: 10px/var(--th) var(--font-mono); letter-spacing: .04em; color: var(--text-secondary); white-space: nowrap; }
+.row .slot span { display: inline-block; }
+.row .slot.long span { animation: roll 7s ease-in-out infinite alternate; }
+@keyframes roll {
+    0%, 18% { transform: none; }
+    82%, 100% { transform: translateX(var(--x)); }
+}
+.row .slot.swap { animation: swap .35s var(--out); }
+@keyframes swap { from { opacity: 0; transform: translateY(-60%); } to { opacity: 1; transform: none; } }
+.row.void { opacity: .3; }
+.row.ok { --st: var(--ok); }
+.row.warn { --st: var(--warn); }
+.row.dead { --st: var(--dead); }
+.row.pc .flaps:first-of-type { color: var(--ar); }
+
+#band { position: relative; display: flex; align-items: flex-end; gap: 12px; margin: auto 0 0; padding: 6px 0 9px; border-top: 1px solid var(--border-subtle); }
+#band::before { content: ""; position: absolute; left: -3px; top: -3px; width: 5px; height: 5px; background: var(--amber); transform: rotate(45deg); }
+#count { --t: 20px; --th: 30px; color: var(--ar); }
+#tally { --t: 12px; --th: 18px; color: var(--text-secondary); }
+#last { display: flex; align-items: flex-end; gap: 4px; color: var(--text-secondary); }
+#band .reg { position: static; flex: none; margin-bottom: 4px; }
+#lcd { position: relative; flex: 1; min-width: 0; display: flex; gap: 6px; height: 30px; padding: 3px; box-sizing: border-box; background: var(--sa); box-shadow: 0 0 0 1px var(--border-default), 0 0 0 3px var(--sa), 0 0 0 4px var(--border-subtle); }
+#lcd::before, #lcd::after { content: ""; position: absolute; width: 3px; height: 3px; background: var(--text-faint); }
+#lcd::before { left: -4px; top: -4px; }
+#lcd::after { right: -4px; bottom: -4px; }
+#lcd .tags { flex: none; display: flex; flex-direction: column; justify-content: space-between; font: 7px/8px var(--font-mono); letter-spacing: .06em; white-space: nowrap; }
+#lcd .tags span { display: flex; gap: 4px; }
+#lcd .tags b { font-weight: normal; }
+#lcd .tags i { font-style: normal; min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
+#lcd [data-g="cpu"] { color: var(--ar); }
+#lcd [data-g="net"] i:first-of-type { color: var(--link-hover); }
+#lcd [data-g="net"] i:last-of-type { color: var(--link-primary); }
+#lcd [data-g="net"] b { color: var(--link-hover); }
+#lcd [data-g="ram"] { color: var(--gr); }
+#lcd svg { flex: 1; min-width: 0; height: 100%; background: linear-gradient(var(--bg-elevated), var(--bg-elevated)) 0 25% / 100% 1px no-repeat, linear-gradient(var(--bg-elevated), var(--bg-elevated)) 0 50% / 100% 1px no-repeat, linear-gradient(var(--bg-elevated), var(--bg-elevated)) 0 75% / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--bg-elevated) 0 1px, transparent 1px 10%); }
+#lcd polyline { fill: none; stroke-width: 1; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+#lcd .cpu { stroke: var(--ar); }
+#lcd .ram { stroke: var(--gr); }
+#lcd .rx { stroke: var(--link-hover); }
+#lcd .tx { stroke: var(--link-primary); }
+#pages { display: flex; gap: 3px; margin: 0 0 4px; }
+#pages i { width: 10px; height: 2px; background: var(--border-default); }
+#pages i.on { background: var(--amber); }
+
+#rig { position: relative; z-index: 2; flex: none; display: flex; flex-direction: column; width: 240px; background: var(--bg-surface); border-left: 1px solid var(--sa); animation: deal .7s .15s var(--out) both; }
+#rig::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px); z-index: 5; }
+#rig button { position: relative; display: flex; flex-direction: column; justify-content: space-between; width: 100%; padding: 14px; border: 0; overflow: hidden; text-align: left; cursor: pointer; outline: none; }
+#rig button::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .35), transparent); transform: skewX(-18deg); transition: left .6s var(--out); pointer-events: none; }
+#rig button:hover::after { left: 130%; }
+#rig button:focus-visible { box-shadow: inset 0 0 0 2px var(--gr); }
+.go { flex: 1.65; background: var(--ar); color: var(--sa); transition: background var(--transition-normal); }
+.go:hover { background: #fff; }
+.go strong { font: 700 34px/0.9 var(--cond); letter-spacing: .06em; }
+.go .chev { display: flex; align-self: flex-end; gap: 1px; }
+.go .chev svg { width: 18px; height: 30px; fill: none; stroke: var(--sa); stroke-width: 5; animation: chev 1.6s var(--ease) infinite; }
+.go .chev svg:nth-child(2) { animation-delay: .2s; }
+.go .chev svg:nth-child(3) { animation-delay: .4s; }
+.go:hover .chev svg { animation-duration: .8s; }
+@keyframes chev {
+    0%, 100% { opacity: .15; transform: translateX(-4px); }
+    40% { opacity: 1; transform: none; }
+}
+.go .notch, .exit .notch { position: absolute; width: 12px; height: 12px; border-radius: 50%; }
+.go .notch { bottom: -6px; }
+.exit .notch { top: -6px; }
+.notch.l { left: -6px; background: var(--sa); }
+.notch.r { right: -6px; background: var(--sa); }
+.perf { position: relative; z-index: 1; flex: none; height: 0; border-top: 2px dashed var(--sa); margin: -1px 12px; }
+.exit { flex: 1; justify-content: flex-end !important; background: var(--bg-base); color: var(--gr); transition: color var(--transition-fast); }
+.exit::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 12px; background: repeating-linear-gradient(-45deg, var(--gr) 0 7px, transparent 7px 14px); border-bottom: 2px solid var(--sa); opacity: .55; transition: opacity var(--transition-fast), background var(--transition-fast); }
+.exit:hover { color: var(--ar); }
+.exit:hover::before { opacity: 1; background: repeating-linear-gradient(-45deg, var(--ar) 0 7px, transparent 7px 14px); }
+.exit strong { font: 700 22px/0.9 var(--cond); letter-spacing: .2em; }
+@keyframes deal { from { transform: translateY(-100%); } to { transform: none; } }
+</style>
+</head>
+<body>
+<div id="offline">
+    <div id="stage">
+        <div id="art">
+            <aside id="rail">
+                <div class="cnt"><b data-n="svc"></b><span data-k="service"></span></div>
+                <div id="meter"></div>
+                <div class="cnt"><b data-n="host"></b><span data-k="host"></span></div>
+                <i class="tear"></i>
+            </aside>
+            <section id="board">
+                <span class="frame"></span>
+                <span class="reg" style="right: 22px; top: 6px"></span>
+                <div id="head">
+                    <span id="slab"><span id="title" class="flaps"></span></span>
+                    <div id="clock"><span class="flaps"></span><b data-c="ap"></b></div>
+                </div>
+                <div id="sub"><span data-c="date"></span><span data-k="zone"></span><span><span data-k="jdn"></span> <span data-c="jdn"></span></span><i id="next"></i></div>
+                <div id="cols" class="grid"><span></span><span data-k="service"></span><span data-k="host"></span><span data-k="role"></span><span></span><span></span><span data-k="ms"></span><span data-k="status"></span></div>
+                <div id="rows"></div>
+                <div id="band">
+                    <span id="count" class="flaps"></span>
+                    <span class="reg"></span>
+                    <span id="tally" class="flaps"></span>
+                    <span id="last"><span class="flaps"></span><b data-c="lap"></b></span>
+                    <div id="lcd">
+                        <div class="tags"><span data-g="cpu"><b data-k="cpu"></b><i data-s="cpu"></i></span><span data-g="net"><b data-k="net"></b><i data-s="rx"></i><i data-s="tx"></i></span><span data-g="ram"><b data-k="ram"></b><i data-s="ram"></i></span></div>
+                        <svg viewBox="0 0 100 24" preserveAspectRatio="none"><polyline class="ram"/><polyline class="cpu"/><polyline class="tx"/><polyline class="rx"/></svg>
+                    </div>
+                    <div id="pages"></div>
+                </div>
+            </section>
+        </div>
+        <div id="rig">
+            <button class="go" type="button">
+                <i class="notch l"></i><i class="notch r"></i>
+                <span class="chev"><svg viewBox="0 0 18 30"><path d="M3 3l11 12L3 27"/></svg><svg viewBox="0 0 18 30"><path d="M3 3l11 12L3 27"/></svg><svg viewBox="0 0 18 30"><path d="M3 3l11 12L3 27"/></svg></span>
+                <strong data-k="go"></strong>
+            </button>
+            <i class="perf"></i>
+            <button class="exit" type="button">
+                <i class="notch l"></i><i class="notch r"></i>
+                <strong data-k="exit"></strong>
+            </button>
+        </div>
+    </div>
+    <div id="bar">
+        <img id="arms" src="downloadlogo.png" alt="">
+    </div>
+</div>
+<script type="application/json" id="lang">
+{
+    "title": "NO CONNECTION",
+    "go": "CONTINUE",
+    "exit": "EXIT",
+    "zone": "JST",
+    "jdn": "JDN",
+    "service": "SERVICE",
+    "host": "HOST",
+    "role": "ROLE",
+    "ms": "MS",
+    "status": "STATUS",
+    "pc": "PC",
+    "primary": "PRI",
+    "backup": "BAK",
+    "s_online": "ONLINE",
+    "s_offline": "OFFLINE",
+    "s_dns": "NO DNS",
+    "s_refused": "REFUSED",
+    "s_timeout": "TIMEOUT",
+    "s_tls": "TLS",
+    "s_bad": "BAD REPLY",
+    "s_unreachable": "UNREACHABLE",
+    "s_http": "HTTP",
+    "cpu": "CPU",
+    "net": "NET",
+    "ram": "RAM"
+}
+</script>
+<script src="/js/time.js"></script>
+<script>
+(() => {
+    const L = JSON.parse(document.getElementById('lang').textContent);
+    const H = window.hub;
+    const $ = s => document.querySelector(s);
+    const ROWS = 6, EVERY = 10000, PAGE = 6000, STEP = 70, HIST = 12, LAT = 10;
+    const DRUM = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:./-';
+    const TONE = { online: 'ok', http: 'warn', bad: 'warn', tls: 'warn', offline: 'dead', dns: 'dead', refused: 'dead', timeout: 'dead', unreachable: 'dead' };
+    document.querySelectorAll('[data-k]').forEach(n => { n.textContent = L[n.dataset.k]; });
+
+    const LEAF = '<span class="u"><span> </span></span><span class="l"><span> </span></span><span class="fu"><span> </span></span><span class="fl"><span> </span></span>';
+    const tiles = (host, n, seps = []) => {
+        host.replaceChildren(...Array.from({ length: n }, (_, i) => {
+            const t = document.createElement('i');
+            if (seps.includes(i)) {
+                t.className = 'sep';
+                t.textContent = ' ';
+            } else {
+                t.innerHTML = LEAF;
+                t.now = ' ';
+            }
+            return t;
+        }));
+        return host;
+    };
+    const show = (c, to) => {
+        const [u, l, fu, fl] = c.children;
+        u.firstChild.textContent = to;
+        fu.firstChild.textContent = c.now;
+        l.firstChild.textContent = c.now;
+        fl.firstChild.textContent = to;
+        c.now = to;
+        c.classList.remove('go');
+        void c.offsetWidth;
+        c.classList.add('go');
+    };
+    const turn = (c, to, delay) => {
+        if (c.classList.contains('sep')) {
+            c.textContent = to;
+            return;
+        }
+        if (c.dataset.c === to && !c.spun) return;
+        clearTimeout(c.t);
+        c.dataset.c = to;
+        c.spun = false;
+        const end = DRUM.indexOf(to);
+        if (end < 0) {
+            c.t = setTimeout(() => show(c, to), delay);
+            return;
+        }
+        let at = Math.max(0, DRUM.indexOf(c.now));
+        const dist = (end - at + DRUM.length) % DRUM.length;
+        if (!dist) return;
+        const hops = Math.min(dist, 5 + (Math.random() * 6 | 0));
+        at = (end - hops + DRUM.length) % DRUM.length;
+        const step = () => {
+            at = (at + 1) % DRUM.length;
+            show(c, DRUM[at]);
+            if (at !== end) c.t = setTimeout(step, STEP);
+        };
+        c.t = setTimeout(step, delay);
+    };
+    const flap = (host, text, right, lag = 22) => {
+        clearInterval(host.spin);
+        const cells = [...host.children];
+        const s = (right ? String(text).padStart(cells.length) : String(text).padEnd(cells.length)).slice(0, cells.length).toUpperCase();
+        cells.forEach((c, i) => turn(c, s[i], i * lag));
+    };
+    const spin = host => {
+        clearInterval(host.spin);
+        const cells = [...host.children].filter(c => !c.classList.contains('sep'));
+        host.spin = setInterval(() => cells.forEach(c => {
+            clearTimeout(c.t);
+            c.spun = true;
+            show(c, DRUM[(DRUM.indexOf(c.now) + 1) % DRUM.length || 1]);
+        }), STEP);
+    };
+
+    const dots = (host, n) => {
+        host.replaceChildren(...Array.from({ length: n }, (_, i) => {
+            const d = document.createElement('i');
+            d.className = 'dot';
+            d.style.setProperty('--i', i);
+            return d;
+        }));
+        return host;
+    };
+    const setDot = (d, tone) => {
+        const was = d.dataset.t || '';
+        if (was === tone) return;
+        clearTimeout(d.t);
+        d.dataset.t = tone;
+        const on = () => {
+            d.style.setProperty('--c', `var(--${tone})`);
+            d.classList.add('on');
+        };
+        if (!tone) d.classList.remove('on');
+        else if (!was) on();
+        else {
+            d.classList.remove('on');
+            d.t = setTimeout(on, 240);
+        }
+    };
+
+    const title = tiles($('#title'), L.title.length);
+    const face = tiles($('#clock .flaps'), 8, [2, 5]);
+    const count = tiles($('#count'), 2);
+    const tally = tiles($('#tally'), 4);
+    const last = tiles($('#last .flaps'), 8, [2, 5]);
+    const C = (k, v) => document.querySelectorAll(`[data-c="${k}"]`).forEach(n => { n.textContent = v; });
+    const clock = () => {
+        const n = propertime();
+        flap(face, `${n.hr}:${n.min}:${n.sec}`, false, 0);
+        C('ap', n.ampm);
+        C('date', n.toAltFormats()[6]);
+        C('jdn', propertime.toJDN(n.year, n.month, n.day));
+    };
+    const heading = () => (data ? data.pc : navigator.onLine) ? L.title.replace(/^\S+\s/, m => ' '.repeat(m.length)) : L.title;
+    setTimeout(() => flap(title, heading(), false, 45), 250);
+    clock();
+    setInterval(clock, 1000);
+
+    const board = $('#board');
+    const rows = $('#rows');
+    const pages = $('#pages');
+    const meter = $('#meter');
+    const hist = new Map(), lat = new Map();
+    let lines = [], data = null, page = 0, nic = 0, built = 0, probes = 0;
+
+    const build = svc => {
+        if (built === svc) return;
+        built = svc;
+        board.style.setProperty('--svc', svc);
+        rows.replaceChildren();
+        lines = Array.from({ length: ROWS }, () => {
+            const r = document.createElement('div');
+            r.className = 'row grid void';
+            const lamp = document.createElement('i');
+            lamp.className = 'dot lamp';
+            const slot = document.createElement('span');
+            slot.className = 'slot';
+            const f = n => tiles(document.createElement('span'), n);
+            const svcF = f(svc), roleF = f(3), msF = f(4), stF = f(11);
+            stF.classList.add('st');
+            [svcF, roleF, msF, stF].forEach(x => x.classList.add('flaps'));
+            const hS = dots(document.createElement('span'), HIST);
+            hS.className = 'hist';
+            const lS = dots(document.createElement('span'), LAT * 4);
+            lS.className = 'lat';
+            r.append(lamp, svcF, slot, roleF, hS, lS, msF, stF);
+            rows.appendChild(r);
+            return { r, lamp, svcF, slot, roleF, hS, lS, msF, stF };
+        });
+    };
+
+    const key = e => e.pc ? 'pc' : `${e.svc}|${e.host}`;
+    const level = ms => ms == null ? 0 : ms < 250 ? 1 : ms < 1000 ? 2 : ms < 4000 ? 3 : 4;
+    const entries = () => {
+        const pc = data ? data.pc : navigator.onLine;
+        const list = [{ pc: true, status: pc ? 'online' : 'offline' }];
+        (data ? data.services : []).forEach(s => s.hosts.forEach(h => list.push({ svc: s.name, ...h })));
+        return list;
+    };
+    const record = () => {
+        entries().forEach(e => {
+            const k = key(e), tone = TONE[e.status] || '';
+            const h = hist.get(k) || [];
+            h.push(tone);
+            hist.set(k, h.slice(-HIST));
+            if (e.pc) return;
+            const m = lat.get(k) || [];
+            m.push({ lvl: level(e.ms), tone });
+            lat.set(k, m.slice(-LAT));
+        });
+    };
+    const word = e => e.status === 'http' ? `${L.s_http} ${e.code}` : L[`s_${e.status}`] || '';
+    const nicText = () => {
+        const a = data && data.adapters[nic % Math.max(1, data.adapters.length)];
+        return a ? `${a.name} ${a.address}` : '';
+    };
+    const fillSlot = (slot, text) => {
+        if (slot.dataset.v === text) return;
+        slot.dataset.v = text;
+        const s = document.createElement('span');
+        s.textContent = text;
+        slot.replaceChildren(s);
+        slot.classList.remove('swap', 'long');
+        void slot.offsetWidth;
+        slot.classList.add('swap');
+        const over = slot.clientWidth - 12 - s.offsetWidth;
+        if (over < 0) {
+            slot.style.setProperty('--x', `${over}px`);
+            slot.classList.add('long');
+        }
+    };
+    const strip = (l, e) => {
+        const h = e ? hist.get(key(e)) || [] : [];
+        [...l.hS.children].forEach((d, i) => setDot(d, h[i - (HIST - h.length)] || ''));
+        const m = e ? lat.get(key(e)) || [] : [];
+        [...l.lS.children].forEach((d, i) => {
+            const c = m[Math.floor(i / 4) - (LAT - m.length)];
+            setDot(d, c && 3 - (i % 4) < c.lvl ? c.tone : '');
+        });
+    };
+
+    const draw = () => {
+        flap(title, heading(), false, 45);
+        const all = entries();
+        const total = Math.max(1, Math.ceil(all.length / ROWS));
+        page %= total;
+        const shown = all.slice(page * ROWS, page * ROWS + ROWS);
+        lines.forEach((l, i) => {
+            const e = shown[i];
+            strip(l, e);
+            if (!e) {
+                l.r.className = 'row grid void';
+                setDot(l.lamp, '');
+                [l.svcF, l.roleF, l.msF, l.stF].forEach(x => flap(x, ''));
+                fillSlot(l.slot, '');
+                return;
+            }
+            l.r.className = `row grid ${TONE[e.status] || ''}${e.pc ? ' pc' : ''}`;
+            setDot(l.lamp, TONE[e.status] || '');
+            flap(l.svcF, e.pc ? L.pc : e.svc);
+            fillSlot(l.slot, e.pc ? nicText() : e.host);
+            flap(l.roleF, e.pc ? '' : L[e.role] || '');
+            flap(l.msF, e.pc || e.ms == null ? '' : Math.min(9999, e.ms), true);
+            flap(l.stF, word(e));
+        });
+        pages.replaceChildren(...(total > 1 ? Array.from({ length: total }, (_, i) => {
+            const d = document.createElement('i');
+            if (i === page) d.className = 'on';
+            return d;
+        }) : []));
+        const hosts = data ? data.services.flatMap(s => s.hosts) : [];
+        const up = hosts.filter(h => h.status === 'online').length;
+        const svcUp = data ? data.services.filter(s => s.hosts.some(h => h.status === 'online')).length : 0;
+        const svcAll = data ? data.services.length : 0;
+        document.querySelector('[data-n="host"]').innerHTML = `${up}<em>/</em>${hosts.length}`;
+        document.querySelector('[data-n="svc"]').innerHTML = `${svcUp}<em>/</em>${svcAll}`;
+        meter.replaceChildren(...hosts.map(h => {
+            const m = document.createElement('i');
+            if (h.status === 'online') m.className = 'on';
+            else if (TONE[h.status] === 'warn') m.className = 'hit';
+            return m;
+        }));
+    };
+
+    const widest = () => Math.max(L.pc.length, 5, ...(data ? data.services.map(s => s.name.length) : []));
+    let due = 0;
+    const countdown = () => {
+        const busy = board.classList.contains('busy');
+        board.style.setProperty('--n', busy ? 0 : Math.max(0, (due - Date.now()) / EVERY));
+        requestAnimationFrame(countdown);
+    };
+    const secs = () => {
+        const busy = board.classList.contains('busy');
+        flap(count, busy || !due ? '--' : String(Math.max(0, Math.ceil((due - Date.now()) / 1000))).padStart(2, '0'), false, 30);
+    };
+    const scan = async () => {
+        board.classList.add('busy');
+        secs();
+        if (data) lines.forEach(l => { if (!l.r.classList.contains('void') && !l.r.classList.contains('pc')) spin(l.stF); });
+        const got = await H.scan().catch(() => null);
+        if (got) {
+            data = got;
+            probes++;
+            record();
+            const n = propertime();
+            flap(tally, String(probes % 10000).padStart(4, '0'), false, 40);
+            flap(last, `${n.hr}:${n.min}:${n.sec}`, false, 30);
+            C('lap', n.ampm);
+        }
+        board.classList.remove('busy');
+        build(widest());
+        draw();
+        due = Date.now() + EVERY;
+        secs();
+        setTimeout(scan, EVERY);
+    };
+
+    build(widest());
+    draw();
+    flap(tally, '0000', false, 40);
+    secs();
+    requestAnimationFrame(countdown);
+    setInterval(secs, 250);
+    if (H && H.scan) scan();
+    else {
+        window.addEventListener('online', draw);
+        window.addEventListener('offline', draw);
+    }
+    setInterval(() => {
+        const all = entries();
+        if (data && data.adapters.length > 1) nic++;
+        if (all.length > ROWS) page++;
+        if ((data && data.adapters.length > 1) || all.length > ROWS) draw();
+    }, PAGE);
+
+    const SYS = 60;
+    const series = { cpu: [], ram: [], rx: [], tx: [] };
+    const lcd = $('#lcd');
+    const trace = (arr, max) => arr.map((v, i) => `${((i + SYS - arr.length) / (SYS - 1) * 100).toFixed(2)},${(23.5 - Math.min(1, v / max) * 23).toFixed(2)}`).join(' ');
+    const plot = () => {
+        const peak = Math.max(1, ...series.rx, ...series.tx);
+        ['cpu', 'ram'].forEach(k => lcd.querySelector(`.${k}`).setAttribute('points', trace(series[k], 100)));
+        ['rx', 'tx'].forEach(k => lcd.querySelector(`.${k}`).setAttribute('points', trace(series[k], peak)));
+    };
+    const sys = async () => {
+        const s = await H.sys().catch(() => null);
+        if (s) {
+            Object.keys(series).forEach(k => {
+                if (s[k] == null) return;
+                series[k].push(s[k]);
+                if (series[k].length > SYS) series[k].shift();
+                lcd.querySelector(`[data-s="${k}"]`).textContent = Math.round(s[k]);
+            });
+            plot();
+        }
+        setTimeout(sys, 1000);
+    };
+    if (H && H.sys) sys();
+
+    const go = $('.go'), exit = $('.exit');
+    go.addEventListener('click', () => { if (H) H.proceed(); });
+    exit.addEventListener('click', () => { if (H) H.quit(); });
+    if (H) {
+        $('#art').addEventListener('mousedown', e => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            H.drag(true);
+        });
+        window.addEventListener('mouseup', () => H.drag(false));
+        window.addEventListener('blur', () => H.drag(false));
+    }
+    go.focus();
+})();
+</script>
+</body>
+</html>

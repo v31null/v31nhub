@@ -1,0 +1,14 @@
+{
+  "services": {
+    "prono": [
+      { "url": "https://prono.share.zrok.io", "role": "primary" }
+    ]
+  },
+  "hub": [
+    { "url": "https://prono.share.zrok.io/app/hub.json", "exe": "https://prono.share.zrok.io/app/V31null%20Hub.exe", "role": "primary" },
+    { "url": "https://raw.githubusercontent.com/v31null/v31nhub/main/hub.json", "exe": "https://github.com/v31null/v31nhub/releases/latest/download/V31null.Hub.exe", "role": "backup" }
+  ],
+  "online": [
+    "prono"
+  ]
+}

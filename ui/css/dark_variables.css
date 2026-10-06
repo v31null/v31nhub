@@ -1,0 +1,71 @@
+:root {
+    --bg-base: #121212;
+    --bg-surface: #1e1e1e;
+    --bg-elevated: #252525;
+    --bg-overlay: #323232;
+    --bg-hover: #817666;       
+    --bg-active: #62400e;
+
+    --border-subtle: #333333;
+    --border-default: #444444;
+    --border-strong: #ff9800;
+
+    --text-primary: #efefef;
+    --text-secondary: #c8c8c8;
+    --text-muted: #9e9e9e;
+    --text-faint: #616161;
+    
+    --link-primary: #0075b9;
+    --link-hover: #89d0f9;
+
+    --accent-primary: #ffa726;
+    --accent-hover: #ffb74d;
+    --accent-active: #f57c00;
+    --mark-text: white;
+
+    --success: #1b5e20;
+    --green: #4caf50;
+    --success-text: #a5d6a7;
+    --warning: #3e2723;
+    --warning-text: #ffcc80;
+    --danger: #4a1515;
+    --danger-text: #ef9a9a;
+    --danger-bg: #c62828;
+    --danger-hover: #ff5367;
+
+    --status-online: #22c55e;
+    --status-away: #f59e0b;
+    --status-dnd: #ef4444;
+    --status-offline: #6b7280;
+    --status-activity: #8b5cf6;
+
+    --priority-routine-bg: #333333;
+    --priority-routine-text: #bdbdbd;
+    --priority-priority-bg: #423e10;
+    --priority-priority-text: #fff59d;
+    --priority-emergency-bg: #4a1515;
+    --priority-emergency-text: #ef9a9a;
+
+    --svgnorm: #f7f7f7;
+    --icon-filter: invert(1) brightness(0.88); 
+
+    --sidebar-width: 60px;
+    --panel-width: 240px;
+    --topbar-height: 50px;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-full: 50%;
+
+    --font-family: system-ui, -apple-system, sans-serif;
+    --font-mono: 'Consolas', 'Monaco', monospace;
+
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.2s ease;
+    --z-base: 1;
+    --z-elevated: 10;
+    --z-overlay: 100;
+    --z-modal: 1000;
+}

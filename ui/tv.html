@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Prono</title>
+<link rel="stylesheet" href="/css/dark_variables.css">
+<style>
+html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+#shot { position: absolute; display: block; transform-origin: 50% 50%; }
+#line { position: absolute; left: 0; width: 100vw; height: 2px; margin-top: -1px; background: var(--text-primary); box-shadow: 0 0 6px var(--text-primary), 0 0 18px color-mix(in srgb, var(--text-primary) 60%, transparent); opacity: 0; }
+</style>
+</head>
+<body>
+<img id="shot" alt="">
+<i id="line"></i>
+<script>
+(() => {
+    const H = window.hub;
+    const shot = document.getElementById('shot');
+    const line = document.getElementById('line');
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const play = async m => {
+        Object.assign(shot.style, { left: `${m.x}px`, top: `${m.y}px`, width: `${m.w}px`, height: `${m.h}px` });
+        line.style.top = `${m.y + m.h / 2}px`;
+        line.style.transformOrigin = `${m.x + m.w / 2}px 50%`;
+        shot.src = m.src;
+        await shot.decode();
+        await frame();
+        H.tv('ready');
+        await shot.animate([
+            { transform: 'none', filter: 'brightness(1)' },
+            { transform: 'scaleY(.004)', filter: 'brightness(4)' }
+        ], { duration: 230, easing: 'cubic-bezier(.55, 0, 1, .45)', fill: 'forwards' }).finished;
+        shot.style.visibility = 'hidden';
+        await line.animate([
+            { opacity: 1, transform: `scaleX(${m.w / innerWidth})` },
+            { opacity: 1, transform: 'scaleX(1)' }
+        ], { duration: 220, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'forwards' }).finished;
+        await line.animate([
+            { opacity: 1, transform: 'scaleX(1)' },
+            { opacity: 1, transform: 'scaleX(.003)' }
+        ], { duration: 280, easing: 'cubic-bezier(.55, 0, 1, .45)', fill: 'forwards' }).finished;
+        await line.animate([
+            { opacity: 1, transform: 'scaleX(.003)' },
+            { opacity: 0, transform: 'scaleX(0)' }
+        ], { duration: 160, easing: 'ease-out', fill: 'forwards' }).finished;
+        H.tv('done');
+    };
+    if (H) H.onTv(play);
+})();
+</script>
+</body>
+</html>

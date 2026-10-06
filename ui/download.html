@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prono</title>
+<link rel="stylesheet" href="/css/dark_variables.css">
+<style>
+@property --u { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
+@property --hue { syntax: '<color>'; inherits: true; initial-value: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg-base); }
+body { display: flex; align-items: center; justify-content: center; }
+#installer { --disp: 'Bahnschrift', 'DIN Alternate', 'Arial Narrow', sans-serif; --cond: 'Bahnschrift Condensed', 'Bahnschrift', 'Arial Narrow', sans-serif; --ease: cubic-bezier(.55, 0, .1, 1); --out: cubic-bezier(.23, 1, .32, 1); --rig: 240px; display: flex; width: 900px; height: 560px; background: var(--bg-surface); border-radius: var(--radius-xl); overflow: hidden; font-family: var(--disp); color: var(--text-primary); user-select: none; cursor: default; }
+#stage { --hue: var(--accent-primary); position: relative; flex: 1; overflow: hidden; background: var(--bg-base); transition: --hue .7s ease; }
+#stage.upd { --hue: var(--green); }
+#stage.ok { --hue: var(--green); }
+#stage.err { --hue: var(--text-primary); }
+#stage.cut { --hue: var(--danger-bg); }
+#bar { display: flex; flex-direction: column; align-items: center; gap: 18px; box-sizing: border-box; width: 90px; padding: 10px; background: #000; }
+#arms { display: block; width: 70px; height: auto; }
+.hubbed #arms { cursor: pointer; }
+#win { display: none; gap: 4px; width: 70px; }
+.hubbed #win { display: flex; }
+#win button { flex: 1; display: flex; align-items: center; justify-content: center; height: 22px; padding: 0; background: #000; border: 1px solid var(--svgnorm); cursor: pointer; clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); transition: background var(--transition-fast), border-color var(--transition-fast); animation: rise 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+#win button + button { animation-delay: .08s; }
+#win button:hover { background: var(--bg-elevated); }
+#win .shut:hover { background: var(--danger-bg); border-color: var(--danger-bg); }
+#win svg { width: 10px; height: 10px; fill: none; stroke: var(--svgnorm); stroke-width: 1.6; }
+.item { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 70px; height: 70px; padding: 0; background: #000; border: 1px solid var(--svgnorm); border-radius: var(--radius-xl); cursor: pointer; transition: background var(--transition-fast); animation: rise 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.item:hover, .item.selected { background: var(--bg-elevated); }
+.item svg { width: 35px; height: 35px; fill: var(--svgnorm); }
+@keyframes rise {
+    from { opacity: 0; transform: translateY(50%); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#art { --accent-primary: var(--hue); --accent-hover: color-mix(in srgb, var(--hue), #fff 22%); --accent-active: color-mix(in srgb, var(--hue), #000 22%); --roll: cubic-bezier(.4, .1, .2, 1); position: absolute; top: 0; left: 0; bottom: 0; width: calc(100% - var(--rig)); overflow: hidden; }
+#alarm { position: absolute; inset: 0; pointer-events: none; opacity: 0; box-shadow: inset 0 0 140px color-mix(in srgb, var(--danger-bg) 45%, transparent); transition: opacity .6s; }
+#alarm::before { content: ""; position: absolute; top: 0; bottom: 0; left: -40%; width: 40%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--danger-bg) 35%, transparent), transparent); }
+.cut #alarm { opacity: 1; }
+.cut #alarm::before { animation: alarm 1.1s var(--out) both; }
+@keyframes alarm { to { left: 100%; } }
+#art::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px), linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px); background-size: 30px 30px; background-position: -1px -1px; opacity: .45; -webkit-mask-image: radial-gradient(circle at 60% 50%, #000 20%, transparent 85%); mask-image: radial-gradient(circle at 60% 50%, #000 20%, transparent 85%); }
+#stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px); z-index: 5; }
+.in { animation: enter .9s var(--out) both; animation-delay: var(--d, 0s); }
+@keyframes enter {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes blink { 50% { opacity: .15; } }
+
+#arc { position: absolute; left: 0; top: -11px; width: 180px; height: 180px; overflow: visible; }
+#arc text { font: 700 22px var(--cond); letter-spacing: .08em; }
+#arc .ghost text { fill: none; stroke: var(--border-default); stroke-width: .8; }
+#arc .lit text { fill: var(--accent-primary); }
+#arc .guide { fill: none; stroke: var(--border-subtle); stroke-width: 1; }
+#arc .ticks { fill: none; stroke: var(--text-faint); stroke-width: 5; stroke-dasharray: 1 9; }
+#arcdash { transition: stroke-dasharray .3s linear; }
+
+#brand { position: absolute; left: 160px; top: 26px; }
+#brand h1 { display: flex; align-items: center; gap: 10px; margin: 0; font: 700 34px/1 var(--disp); letter-spacing: .14em; }
+#brand h1::before { content: ""; width: 12px; height: 12px; background: var(--accent-primary); border-radius: 100%; }
+#brand small { display: flex; align-items: center; gap: 8px; margin: 12px 0 0 22px; font: 10px var(--font-mono); color: var(--text-muted); }
+#brand small i { width: 60px; height: 1px; background: var(--text-faint); position: relative; }
+#brand small i::after { content: ""; position: absolute; right: 0; top: -3px; width: 1px; height: 7px; background: var(--text-faint); }
+
+#halftone { position: absolute; right: 0; top: 0; width: 230px; height: 190px; background: radial-gradient(var(--text-faint) 1.1px, transparent 1.6px) 0 0 / 7px 7px; -webkit-mask-image: linear-gradient(225deg, #000, transparent 70%); mask-image: linear-gradient(225deg, #000, transparent 70%); }
+
+#tag { --tc: var(--accent-primary); position: absolute; left: 160px; top: 142px; transform-origin: 0 50%; opacity: 0; }
+#tag[data-s="update"] { --tc: var(--status-away); }
+#tag[data-s="uptodate"] { --tc: var(--status-online); }
+#tag[data-s="error"] { --tc: var(--text-primary); }
+#tag[data-s="error"] .chip::before { animation: blink .8s steps(1) infinite; }
+#tag .chip { display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 8px; background: #000; border: 1px solid var(--tc); font: 600 9px var(--disp); letter-spacing: .24em; color: var(--tc); white-space: pre; clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%); }
+#tag .chip::before { content: ""; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid var(--tc); }
+#tag[data-s="update"] .chip::before { animation: blink .8s steps(1) infinite; }
+#tag[data-s="uptodate"] .chip::before { width: 8px; height: 8px; border: 0; background: var(--tc); }
+#tag.boot { animation: boot .9s linear forwards; }
+@keyframes boot {
+    0% { opacity: 0; transform: scale(.03, .1); }
+    6% { opacity: 1; }
+    10% { opacity: .1; }
+    14% { opacity: 1; transform: scale(.03, .1); }
+    18% { opacity: .2; }
+    22% { opacity: 1; }
+    45% { transform: scale(1, .1); }
+    60% { transform: scale(1, 1); }
+    64% { opacity: .3; }
+    68% { opacity: 1; }
+    72% { opacity: .5; }
+    76% { opacity: 1; }
+    100% { opacity: 1; transform: none; }
+}
+
+#emblem { --f: 0; position: absolute; left: 205px; top: 150px; width: 330px; height: 330px; }
+.sweep { position: absolute; inset: 14px; border-radius: 50%; background: conic-gradient(transparent 0 290deg, color-mix(in srgb, var(--accent-primary) 30%, transparent) 360deg); opacity: 0; transition: opacity .6s; animation: spin 2.4s linear infinite; }
+[data-state="running"] .sweep { opacity: .7; }
+[data-state="paused"] .sweep { opacity: .25; animation-play-state: paused; }
+[data-state="paused"] .tape div { animation-play-state: paused; }
+[data-state="paused"] .level { animation: blink 1s steps(1) infinite; }
+.burst, .burst::after { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--accent-primary); opacity: 0; }
+.burst::after { content: ""; inset: -2px; border-width: 1px; }
+.pop .burst { animation: burst 1s var(--out); }
+.pop .burst::after { animation: burst 1.3s .15s var(--out); }
+@keyframes burst {
+    from { opacity: 1; transform: scale(.35); }
+    to { opacity: 0; transform: scale(1.25); }
+}
+.drain #lvl rect, .drain .level, .drain #arcdash { transition-duration: 1.2s; transition-timing-function: var(--ease); }
+#emblem svg { position: absolute; overflow: visible; }
+#rings { inset: 0; width: 100%; height: 100%; }
+#rings circle { fill: none; transform-origin: 180px 180px; }
+.r1 { stroke: var(--border-default); stroke-width: 1; stroke-dasharray: 2 6; animation: spin 60s linear infinite; }
+.r2 { stroke: var(--accent-primary); stroke-width: 2; stroke-dasharray: 90 470; animation: spin 14s var(--ease) infinite reverse; }
+.r3 { stroke: var(--text-faint); stroke-width: 6; stroke-dasharray: 1 11; opacity: .7; animation: spin 90s linear infinite reverse; }
+.r4 { stroke: var(--border-subtle); stroke-width: 1; }
+#rings line { stroke: var(--text-faint); stroke-width: 1; }
+@keyframes spin { to { transform: rotate(1turn); } }
+.glyph { left: 45px; top: 51px; width: 240px; height: 228px; }
+.glyph.ghost { fill: var(--bg-elevated); transform: translate(12px, 10px); }
+.glyph.line { fill: none; stroke: var(--accent-primary); stroke-width: 2.4; }
+.glyph.fill { fill: var(--accent-primary); }
+#lvl rect { transform: translateY(calc(438px * (1 - var(--f)))); transition: transform .3s linear; }
+.level { position: absolute; left: -18px; right: -30px; height: 1px; top: calc(51px + 228px * (1 - var(--f))); background: linear-gradient(90deg, transparent, var(--accent-primary) 12%, var(--accent-primary) 88%, transparent); opacity: 0; transition: top .3s linear, opacity .4s; }
+.level b { position: absolute; right: 0; bottom: 3px; font: 9px var(--font-mono); font-weight: normal; letter-spacing: .08em; color: var(--accent-primary); }
+.level::before { content: ""; position: absolute; left: 12%; top: -3px; width: 5px; height: 7px; background: var(--accent-primary); }
+.filling .level { opacity: 1; }
+
+#clock { position: absolute; right: 22px; top: 22px; text-align: right; }
+#clock .t { display: flex; align-items: flex-end; justify-content: flex-end; gap: 6px; font: 600 32px/0.85 var(--disp); letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+#clock .t b { font: 600 12px/1 var(--disp); letter-spacing: .12em; color: var(--accent-primary); }
+#clock .d { margin-top: 7px; font: 10px var(--font-mono); letter-spacing: .14em; color: var(--text-muted); text-transform: uppercase; }
+#clock .d span + span { margin-left: 8px; padding-left: 8px; border-left: 1px solid var(--text-faint); color: var(--accent-primary); }
+#clock .d.r { margin-top: 4px; font: 600 10px var(--disp); letter-spacing: .2em; font-feature-settings: "frac" 0; color: var(--text-muted); }
+#sig { display: flex; align-items: flex-end; gap: 2px; height: 22px; margin-right: 8px; }
+#sig i { width: 3px; background: var(--bg-overlay); transition: background .2s; }
+#sig i:nth-child(1) { height: 20%; }
+#sig i:nth-child(2) { height: 40%; }
+#sig i:nth-child(3) { height: 60%; }
+#sig i:nth-child(4) { height: 80%; }
+#sig i:nth-child(5) { height: 100%; }
+#sig i.on { background: var(--accent-primary); }
+
+#cipher { position: absolute; left: 0; top: 120px; width: 170px; height: 190px; overflow: visible; }
+#cipher text { font: 7px var(--font-mono); fill: var(--text-muted); letter-spacing: .08em; }
+#cipher line, #cipher circle.c { fill: none; stroke-width: .8; }
+#cipher .tri { fill: color-mix(in srgb, var(--accent-primary) 5%, transparent); stroke: var(--border-default); stroke-width: 1; stroke-linejoin: round; }
+#cipher .med { stroke: var(--text-faint); }
+#cipher .perp { stroke: var(--text-faint); stroke-dasharray: 3 2; }
+#cipher .circ { stroke: var(--text-muted); }
+#cipher .bis { stroke: var(--accent-primary); stroke-dasharray: 1 2; }
+#cipher .inc { stroke: var(--accent-primary); stroke-width: 1; }
+#cipher .alt { stroke: var(--text-muted); }
+#cipher .eul { stroke: var(--accent-primary); stroke-width: 1.3; }
+#cipher .half { stroke: var(--text-faint); stroke-dasharray: 1 2; }
+#cipher .nine { stroke: var(--accent-primary); stroke-width: 1; }
+#cipher .tris { stroke: var(--text-muted); stroke-dasharray: 2 2; }
+#cipher .cev { stroke: var(--text-faint); }
+#cipher path.c { stroke-width: .8; stroke-linejoin: round; }
+#cipher .eqt { fill: color-mix(in srgb, var(--accent-primary) 22%, transparent); stroke: var(--accent-primary); }
+#cipher .hole { fill: color-mix(in srgb, var(--accent-primary) 12%, transparent); stroke: var(--accent-primary); }
+#cipher .ctri { fill: none; stroke: var(--accent-primary); }
+#cipher .ctr.m { fill: var(--accent-primary); }
+#cipher .ctr { fill: var(--text-primary); }
+#cipher .cl { font: 600 7px var(--disp); fill: var(--text-secondary); letter-spacing: .1em; }
+#cipher .ang { fill: none; stroke: var(--accent-primary); stroke-width: 1; }
+#cipher .deg { font-size: 6px; fill: var(--text-faint); }
+#cipher .sq { fill: none; stroke: var(--text-muted); stroke-width: 1; }
+#cipher .v { fill: var(--accent-primary); }
+#cipher .role { font: 600 8px var(--disp); letter-spacing: .2em; fill: var(--text-secondary); }
+#cipher .k { font: 700 14px var(--disp); fill: var(--accent-primary); }
+#cipher .key { font-size: 6px; fill: var(--accent-primary); letter-spacing: .04em; }
+#cipher .eq { fill: var(--text-secondary); }
+#cipher .pyth { opacity: 0; transition: opacity .5s; }
+#cipher .pyth.on { opacity: 1; }
+#chunks { position: absolute; left: 160px; top: 182px; display: grid; grid-template-columns: repeat(8, 6px); gap: 2px; }
+#chunks i { height: 6px; background: var(--bg-overlay); transition: background .3s; }
+#chunks i.on { background: var(--accent-primary); }
+#chunks i.tip { background: var(--text-primary); animation: blink .5s steps(1) infinite; }
+#chunks + span { position: absolute; left: 160px; top: 266px; width: 62px; height: 1px; background: var(--text-faint); }
+
+#manifest { position: absolute; left: 24px; top: 300px; width: 172px; margin: 0; }
+#manifest div { display: grid; grid-template-columns: 58px 1fr; align-items: baseline; padding: 4px 0; border-top: 1px dashed var(--border-default); }
+#manifest div:last-child { border-bottom: 1px dashed var(--border-default); }
+#manifest dt { font: 600 8px var(--disp); letter-spacing: .22em; color: var(--text-muted); }
+#manifest dd { margin: 0; font: 9px/1.5 var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
+#manifest .sha dd { display: grid; grid-template-columns: repeat(2, auto); justify-content: start; gap: 0 8px; letter-spacing: .04em; }
+#manifest .sha dd span:first-child { color: var(--accent-primary); }
+
+.cross { position: absolute; width: 11px; height: 11px; }
+.cross::before, .cross::after { content: ""; position: absolute; background: var(--text-muted); }
+.cross::before { left: 5px; top: 0; width: 1px; height: 11px; }
+.cross::after { top: 5px; left: 0; height: 1px; width: 11px; }
+
+.corner { position: absolute; width: 14px; height: 14px; border: 0 solid var(--accent-primary); }
+.c1 { left: 12px; top: 12px; border-width: 2px 0 0 2px; }
+.c2 { right: 12px; top: 12px; border-width: 2px 2px 0 0; }
+.c3 { left: 12px; bottom: 12px; border-width: 0 0 2px 2px; }
+.c4 { right: 12px; bottom: 12px; border-width: 0 2px 2px 0; }
+
+.tape { position: absolute; overflow: hidden; white-space: nowrap; background: var(--accent-primary); color: #000; box-shadow: 0 0 0 1px #000; }
+.tape div { display: inline-block; font: 700 13px/24px var(--disp); letter-spacing: .26em; animation: marquee 40s linear infinite; }
+.tape.main { left: -20%; width: 140%; bottom: 74px; height: 24px; transform: rotate(-7deg); clip-path: inset(0 0 0 calc(100% - var(--u))); animation: unroll 1.5s .3s var(--roll) forwards; }
+.tape.main::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(100% - var(--u)); width: 12px; background: linear-gradient(90deg, var(--accent-active), var(--accent-hover) 45%, var(--accent-primary) 65%, var(--accent-active)); box-shadow: 0 0 0 1px #000; animation: cap 1.5s .3s linear forwards; }
+.tape.rise { left: -10px; top: 284px; width: 352px; height: 20px; margin-top: -10px; transform-origin: 0 50%; transform: rotate(-57.68deg); clip-path: inset(0 calc(100% - var(--u)) 0 0); animation: unroll 1.1s 2.15s var(--roll) forwards; }
+.tape.rise div { font-size: 11px; line-height: 20px; animation-duration: 30s; animation-direction: reverse; }
+.tape.rise::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--u) - 10px); width: 10px; background: linear-gradient(90deg, var(--accent-active), var(--accent-primary) 35%, var(--accent-hover) 55%, var(--accent-active)); box-shadow: 0 0 0 1px #000; animation: cap 1.1s 2.15s linear forwards; }
+@keyframes unroll { to { --u: 100%; } }
+@keyframes cap {
+    0%, 92% { opacity: 1; }
+    100% { opacity: 0; }
+}
+.tape.warn { left: -20%; width: 140%; bottom: 52px; height: 10px; background: repeating-linear-gradient(-45deg, var(--accent-primary) 0 7px, #000 7px 14px); transform: rotate(-3deg); opacity: .8; box-shadow: none; clip-path: inset(0 0 0 calc(100% - var(--u))); animation: unroll 1.5s .5s var(--roll) forwards; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+#coord { position: absolute; left: 160px; bottom: 18px; display: flex; gap: 10px; font: 9px var(--font-mono); letter-spacing: .12em; color: var(--text-faint); }
+#ruler { position: absolute; right: 32px; bottom: 20px; width: 150px; height: 9px; background: linear-gradient(90deg, var(--text-faint) 1px, transparent 1px) 0 100% / 6px 4px repeat-x, linear-gradient(90deg, var(--text-muted) 1px, transparent 1px) 0 100% / 30px 9px repeat-x; }
+
+#rig { position: absolute; top: 0; right: 0; bottom: 0; width: var(--rig); display: flex; flex-direction: column; background: var(--bg-surface); border-left: 1px solid #000; z-index: 2; }
+
+#deploy { position: relative; flex: none; display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--accent-primary); color: #000; cursor: pointer; outline: none; transition: height .85s var(--ease), background var(--transition-normal); }
+#deploy:hover { background: var(--accent-hover); }
+#deploy:focus-visible { box-shadow: inset 0 0 0 2px #000; }
+#deploy::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .35), transparent); transform: skewX(-18deg); transition: left .6s var(--out); pointer-events: none; }
+#deploy:hover::after { left: 130%; }
+.head { position: relative; z-index: 1; flex: none; display: flex; align-items: center; gap: 10px; height: 79px; padding: 0 14px 7px; box-sizing: border-box; overflow: hidden; transition: transform .3s var(--out); }
+.notch { position: absolute; width: 12px; height: 12px; border-radius: 50%; }
+.head .notch { bottom: -6px; }
+.body .notch { top: -6px; }
+.notch.l { left: -6px; background: var(--bg-base); }
+.notch.r { right: -6px; background: #000; }
+.head > svg { flex: none; width: 30px; height: 29px; fill: #000; }
+.head b { display: block; font: 700 19px/1 var(--disp); letter-spacing: .16em; }
+.head em { display: block; margin-top: 5px; font: normal 10px var(--font-mono); letter-spacing: .06em; white-space: nowrap; }
+.head em:has([data-cache]:not(:empty)) .ver { display: none; }
+
+.snip { position: absolute; z-index: 3; left: 0; right: 0; top: 72px; display: block; height: 14px; padding: 0; border: 0; background: transparent; cursor: inherit; transition: opacity .15s; }
+.snip::before { content: ""; position: absolute; left: 12px; right: 12px; top: 6px; height: 2px; background: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 9px); transition: background .2s, left .3s var(--out); }
+.snip svg { position: absolute; left: 12px; top: -3px; width: 20px; height: 20px; fill: none; stroke: #000; stroke-width: 2; display: none; overflow: visible; }
+.snip svg g { transform-box: view-box; transform-origin: 12.7px 12px; }
+[data-installed="1"] .snip { cursor: pointer; }
+[data-installed="1"] .snip::before { left: 38px; }
+[data-installed="1"] .snip svg { display: block; }
+[data-installed="1"] .snip:hover::before { background: repeating-linear-gradient(90deg, var(--danger-bg) 0 5px, transparent 5px 9px); }
+.snipping .snip svg { animation: snip .48s var(--ease) forwards; }
+.snipping .snip svg .b1 { animation: chomp1 .48s ease-in-out forwards; }
+.snipping .snip svg .b2 { animation: chomp2 .48s ease-in-out forwards; }
+.snipping .snip::before { left: 12px; background: repeating-linear-gradient(90deg, var(--danger-bg) 0 5px, transparent 5px 9px); }
+.cut .snip::before, .cut .snip:hover::before, .mend .snip::before { left: 12px; background: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 9px); }
+@keyframes snip { to { transform: translateX(196px); } }
+.mend .snip svg { animation: unsnip .5s var(--ease) both; }
+@keyframes unsnip { from { transform: translateX(196px); } to { transform: none; } }
+@keyframes chomp1 { 35% { transform: rotate(-20deg); } 100% { transform: rotate(2deg); } }
+@keyframes chomp2 { 35% { transform: rotate(20deg); } 100% { transform: rotate(-2deg); } }
+
+.hazard { position: relative; z-index: 1; flex: none; height: 14px; background: repeating-linear-gradient(-45deg, #000 0 7px, transparent 7px 14px); border-top: 2px solid #000; border-bottom: 2px solid #000; }
+
+.prompt { position: absolute; inset: 0 0 7px 0; display: none; flex-direction: column; justify-content: center; gap: 7px; padding: 0 14px; color: var(--text-primary); }
+.prompt span { position: relative; font: 700 11px var(--disp); letter-spacing: .3em; }
+.prompt div { position: relative; display: flex; gap: 6px; }
+.prompt button { flex: 1; height: 24px; padding: 0; border: 1px solid #000; font: 600 9px var(--disp); letter-spacing: .24em; cursor: pointer; clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+.prompt .kill { background: #000; color: var(--text-primary); }
+.prompt .kill:hover { background: var(--text-primary); color: var(--danger-bg); }
+.prompt .back { background: transparent; color: #000; }
+.prompt .back:hover { background: rgba(0, 0, 0, .2); }
+.cut .head::before, .mend .head::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, rgba(0, 0, 0, .4) 0 9px, transparent 9px 18px) 0 0 / 25.456px 25.456px, var(--danger-bg); animation: wipe .4s var(--out) both, slash 1.2s linear infinite; }
+.mend .head::before { animation: unwipe .4s var(--ease) both, slash 1.2s linear infinite; }
+.mend .head > svg, .mend .head > div:not(.prompt) { animation: enter .35s .25s var(--out) both; }
+.mend .prompt { display: flex; animation: leave .2s ease both; }
+.mend #deploy { transition: height .85s var(--ease), background .5s ease; }
+.mend .tall strong { display: none; }
+.mend .tall .u { display: block; }
+@keyframes unwipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 100% 0 0); } }
+@keyframes leave { to { opacity: 0; } }
+.cut .head > svg, .cut .head > div:not(.prompt) { visibility: hidden; }
+.cut .prompt { display: flex; animation: enter .35s .3s var(--out) both; }
+.cut .hazard { background: repeating-linear-gradient(-45deg, #000 0 7px, var(--danger-bg) 7px 14px); }
+.body { position: relative; flex: 1; padding-top: 7px; overflow: hidden; }
+.severed .snip { opacity: 0; }
+.severed .body { background: var(--danger-bg); animation: shed .75s .1s cubic-bezier(.5, 0, .9, .4) forwards; }
+.severed .head { animation: lift .55s cubic-bezier(.5, 0, .9, .4) forwards; }
+.deal { animation: deal .7s var(--out) both; }
+@keyframes lift { to { transform: translate(6px, -130px) rotate(-5deg); } }
+@keyframes shed { to { transform: translate(-10px, 560px) rotate(4deg); } }
+@keyframes deal { from { transform: translateY(-100%); } to { transform: none; } }
+@keyframes wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes slash { to { background-position: 25.456px 0, 0 0; } }
+
+.tall { position: absolute; left: 0; right: 0; top: 25px; height: 456px; transition: opacity .3s ease; }
+.tall strong { position: absolute; left: 8px; bottom: 82px; writing-mode: vertical-rl; transform: rotate(180deg); font: 700 96px/0.78 var(--cond); letter-spacing: .01em; }
+.tall strong:not(.o) { z-index: 1; }
+.tall strong.o { left: 17px; bottom: 74px; color: transparent; -webkit-text-stroke: 1px #000; opacity: .35; }
+.tall .u { display: none; font-size: 84px; }
+.cut .tall strong { display: none; }
+.cut .tall .u { display: block; }
+.chev { position: absolute; right: 22px; top: 30px; display: flex; flex-direction: column; gap: 2px; }
+.chev svg { width: 34px; height: 20px; fill: none; stroke: #000; stroke-width: 5; animation: chev 1.6s var(--ease) infinite; }
+.chev svg:nth-child(2) { animation-delay: .2s; }
+.chev svg:nth-child(3) { animation-delay: .4s; }
+.chev svg:nth-child(4) { animation-delay: .6s; }
+#deploy:hover .chev svg { animation-duration: .8s; }
+@keyframes chev {
+    0%, 100% { opacity: .15; transform: translateY(-4px); }
+    40% { opacity: 1; transform: none; }
+}
+.spec { position: absolute; right: 14px; bottom: 82px; width: 96px; font: 10px/1.7 var(--font-mono); text-align: right; }
+.wipe { position: absolute; right: 14px; bottom: 150px; display: none; align-items: center; justify-content: flex-end; gap: 8px; width: 120px; cursor: pointer; font: 600 10px var(--disp); letter-spacing: .24em; color: #000; }
+.wipe input { position: absolute; opacity: 0; pointer-events: none; }
+.wipe i { position: relative; flex: none; width: 12px; height: 12px; border: 2px solid #000; clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%); transition: background .2s; }
+.wipe i::after { content: ""; position: absolute; inset: 2px; background: repeating-linear-gradient(-45deg, var(--danger-bg) 0 2px, transparent 2px 4px); transform: scale(0); transition: transform .25s var(--out); }
+.wipe input:checked + i { background: #000; }
+.wipe input:checked + i::after { transform: scale(1); }
+.wipe input:focus-visible + i { outline: 1px solid #000; outline-offset: 2px; }
+.cut .wipe { display: flex; animation: enter .4s .45s var(--out) both; }
+.mend .wipe { display: flex; animation: leave .2s ease both; }
+.spec span { display: block; border-top: 1px solid rgba(0, 0, 0, .35); }
+.stub { position: absolute; left: 0; right: 0; bottom: 0; height: 68px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-top: 2px dashed #000; }
+.stub svg { display: block; fill: #000; }
+.stub span { font: 600 9px var(--font-mono); letter-spacing: .5em; margin-right: -.5em; }
+
+#console { --accent-primary: var(--hue); --accent-hover: color-mix(in srgb, var(--hue), #fff 22%); position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 11px; padding: 14px; box-sizing: border-box; overflow: hidden; background: linear-gradient(var(--bg-surface), var(--bg-base)); }
+#console::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--accent-primary); box-shadow: 0 0 14px var(--accent-primary); opacity: 0; }
+#console > * { flex: none; opacity: 0; }
+.open #console > * { animation: drop .5s var(--out) both; animation-delay: calc(.55s + var(--i) * 70ms); }
+@keyframes drop {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: none; }
+}
+.open #console::before { animation: sweep 1.1s .45s var(--ease) both; }
+@keyframes sweep {
+    0% { opacity: 1; top: 0; }
+    85% { opacity: 1; }
+    100% { opacity: 0; top: 100%; }
+}
+.open #deploy { height: 104px; cursor: default; }
+.open #deploy:hover { background: var(--accent-primary); }
+.open #deploy::after { display: none; }
+.open .tall { opacity: 0; }
+.upd #deploy { background: var(--hue); }
+.upd #deploy:hover { background: color-mix(in srgb, var(--hue), #fff 18%); }
+.upd.open:not(.cut) #deploy:hover { background: var(--hue); }
+.err #deploy { background: var(--hue); }
+.err #deploy:hover { background: color-mix(in srgb, var(--hue), #000 10%); }
+.ok #deploy { background: var(--text-primary); }
+.ok #deploy:hover { background: color-mix(in srgb, var(--text-primary), var(--green) 16%); }
+.ok.open:not(.cut) #deploy:hover { background: var(--text-primary); }
+.ok:not(.cut):not(.mend) .hazard { background: repeating-linear-gradient(-45deg, var(--green) 0 7px, transparent 7px 14px); }
+.ok:not(.cut):not(.mend) .head > svg { fill: var(--green); }
+.ok:not(.cut):not(.mend) .chev svg { stroke: var(--green); }
+.ok:not(.cut):not(.mend) .tall strong.o { -webkit-text-stroke-color: var(--green); opacity: .9; }
+.ok:not(.cut):not(.mend) .spec span { border-top-color: color-mix(in srgb, var(--green) 60%, transparent); }
+.lock #deploy, .lock #deploy:hover { cursor: default; background: var(--hue); }
+.lock #deploy::after { display: none; }
+.lock:not(.cut) .chev svg { animation: none; opacity: .25; }
+.why { display: none; }
+.err .head em > * { display: none; }
+.err .head em .why { display: inline; }
+#space { position: absolute; inset: 0; z-index: 4; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, .55); cursor: pointer; }
+.nospace #space { display: flex; animation: enter .25s var(--out) both; }
+#space .card { width: 280px; padding-bottom: 14px; background: var(--text-primary); color: #000; transform-origin: 0 50%; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); }
+.nospace #space .card { animation: boot .7s linear both; }
+#space .card::before { content: ""; display: block; height: 12px; background: repeating-linear-gradient(-45deg, #000 0 7px, transparent 7px 14px); border-bottom: 2px solid #000; }
+#space b { display: block; padding: 14px 16px 12px; font: 700 18px var(--disp); letter-spacing: .2em; }
+#space .rows { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 16px; padding-top: 10px; border-top: 1px dashed #000; font: 11px var(--font-mono); }
+#space .rows > span:nth-child(odd) { align-self: center; font: 600 9px var(--disp); letter-spacing: .24em; }
+#space .rows > span:nth-child(even) { text-align: right; }
+#space i { font-style: normal; font-weight: 700; }
+.cut #deploy, .cut #deploy:hover { height: 100%; background: var(--danger-bg); cursor: pointer; }
+.cut #deploy::after { display: block; }
+.cut.severed #deploy::after, .mend #deploy::after { display: none; }
+.cut.severed #deploy, .cut.severed #deploy:hover { background: transparent; }
+.cut .tall { opacity: 1; }
+
+.label { font: 600 9px var(--disp); letter-spacing: .24em; color: var(--text-muted); }
+.mono { font-family: var(--font-mono); }
+
+.phase { display: flex; align-items: center; gap: 8px; font: 600 11px var(--disp); letter-spacing: .24em; }
+.phase::before { content: ""; width: 7px; height: 7px; background: var(--accent-primary); animation: blink 1s steps(1) infinite; }
+.phase .mono { margin-left: auto; font-size: 10px; letter-spacing: .08em; color: var(--text-muted); }
+[data-state="paused"] .phase::before { background: var(--text-muted); animation: none; }
+[data-state="done"] .phase::before { background: var(--status-online); animation: none; }
+
+.big { display: flex; align-items: flex-end; justify-content: space-between; height: 46px; }
+.pct { font: 700 50px/0.82 var(--disp); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.pct small { font-size: 20px; color: var(--accent-primary); letter-spacing: 0; }
+.bytes { font: 10px/1.5 var(--font-mono); text-align: right; color: var(--text-secondary); }
+.bytes span { color: var(--text-faint); }
+
+.segs { display: flex; gap: 2px; height: 12px; }
+.segs i { flex: 1; background: var(--bg-overlay); transform: skewX(-20deg); transition: background .2s; }
+.segs i.on { background: var(--accent-primary); }
+.segs i.tip { background: var(--text-primary); animation: blink .5s steps(1) infinite; }
+[data-state="done"] .segs i.on { background: var(--status-online); }
+
+.speed .top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 5px; }
+.speed .top b { font: 600 14px var(--font-mono); }
+.speed .top .mono { font-size: 9px; color: var(--text-faint); }
+.speed .top .peak { margin-left: auto; }
+.speed svg { display: block; width: 100%; height: 38px; background: linear-gradient(var(--border-subtle) 1px, transparent 1px) 0 0 / 100% 9.5px; border-bottom: 1px solid var(--border-default); }
+.speed polyline { fill: none; stroke: var(--accent-primary); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.speed path { fill: var(--accent-primary); opacity: .14; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.stats div { padding-left: 8px; border-left: 2px solid var(--accent-primary); }
+.stats div:nth-child(n+3) { border-left-color: var(--border-default); }
+.stats b { display: block; margin-top: 3px; font: 12px var(--font-mono); white-space: nowrap; color: var(--text-primary); font-weight: normal; }
+
+.steps { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.steps li { display: flex; align-items: center; gap: 9px; height: 16px; font: 600 10px var(--disp); letter-spacing: .22em; color: var(--text-faint); }
+.steps li .mono { font-size: 9px; letter-spacing: 0; }
+.steps li::after { content: ""; margin-left: auto; width: 8px; height: 8px; border: 1px solid var(--text-faint); box-sizing: border-box; }
+.steps li.done { color: var(--text-secondary); }
+.steps li.done::after { background: var(--accent-primary); border-color: var(--accent-primary); }
+.steps li.now { color: var(--text-primary); }
+.steps li.now::after { border-color: var(--accent-primary); animation: blink .6s steps(1) infinite; background: var(--accent-primary); }
+.steps li.now .mono { color: var(--accent-primary); }
+
+.path { display: flex; align-items: center; height: 28px; background: var(--bg-base); border: 1px solid var(--border-default); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%); }
+.path span { flex: 1; min-width: 0; padding: 0 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10px var(--font-mono); color: var(--text-secondary); }
+.path button { flex: none; display: flex; align-items: center; justify-content: center; width: 30px; height: 100%; padding: 0; border: 0; border-left: 1px solid var(--border-default); background: var(--bg-elevated); cursor: pointer; }
+.path button:hover { background: var(--bg-overlay); }
+.path svg { width: 14px; height: 14px; fill: var(--text-secondary); }
+
+.ctl { display: flex; gap: 8px; margin-top: auto; }
+.ctl button { flex: 1; height: 30px; padding: 0; border: 1px solid var(--border-default); background: transparent; color: var(--text-primary); font: 600 10px var(--disp); letter-spacing: .26em; cursor: pointer; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast); }
+.ctl button:hover { background: var(--bg-elevated); border-color: var(--text-muted); }
+.ctl .stop:hover { background: var(--danger-bg); border-color: var(--danger-bg); }
+.ctl .go { display: none; background: var(--accent-primary); border-color: var(--accent-primary); color: #000; }
+.ctl .go:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+[data-state="done"] .ctl .go { display: block; }
+[data-state="done"] .ctl .hold, [data-state="done"] .ctl .stop { display: none; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+        <symbol id="glyph" viewBox="0 0 461 438"><path fill-rule="evenodd" d="M87.4 435.5C90.9 429.9 92.3 423.4 95.2 417.5C106 395.8 113.3 372.3 124.2 350.5C131.3 336.4 136 320.8 143.2 306.5C146.6 299.7 151.7 291.1 153.2 283.5C159 279.5 173.5 282.1 180.5 282C199.8 281.9 219.3 282.5 238.5 280.9C273.5 278.1 308.6 268 339.5 252C350.7 246.1 360.7 238.6 371.2 231.5C389.3 219.2 407 201.8 419 183.5C434.2 160.4 446.5 136.8 454.2 110.5C462.2 83 463.4 52.8 441.5 30.9C430.4 19.8 415 14 400.5 9.8C367.2 0.3 331.5 1 296.5 1C272.5 1 248.5 1 224.5 1C216.5 1 208.5 1.6 200.5 1.8C197.2 2 191.4 0.9 188.6 2.5C184.1 9.5 182.4 18.1 178.7 25.5C168.2 46.6 159.8 69.2 150 90.5C147.3 96.3 145.7 102.8 142.8 108.5C131.9 130.2 124.7 153.7 113.8 175.5C106.7 189.7 101.9 205.2 94.8 219.5C88.8 231.4 84.7 244.5 78.7 256.5C64.7 284.5 53.9 314.3 41 342.5C30.9 364.6 21.6 387.2 12 409.5C8.4 418.1 5.6 427.4 1 435.5C2.2 436.7 5.8 436.1 7.5 436.3C16.8 437.3 26.1 437 35.5 437.1C46.5 437.2 57.5 437 68.5 437C73.5 437 83 437.9 87.4 435.5ZM184.5 212.8C188.3 201.4 194.1 190.5 198.9 179.5C206.5 161.8 213.9 143.9 221.8 126.5C228.2 112.6 233.7 98.4 240 84.5C241.9 80.3 243.1 73.8 246.4 70.5C249.9 69.3 254.8 70.1 258.5 70.1C266.8 70 275.2 69.9 283.5 70C304.6 70.1 326.8 69.5 346.5 77.9C354.9 81.4 363.3 87.2 365.9 96.5C370.3 112 363.4 128.8 357 142.5C343.4 172 320.1 194.4 289.5 205.8C275.5 211 260.4 212.3 245.5 213.3C231.5 214.2 217.5 214 203.5 213.8C198.7 213.8 188.6 215.4 184.5 212.8Z"/><path d="M172 293L203.2 293L197.5 317.4C207.7 310.5 220.1 298.6 232.3 295.1C257.7 287.7 282.8 286.1 308 276.2C321 271.1 332.4 262.5 344.8 256C341.4 261.3 337.7 266.5 334.6 272C327.1 285.3 327.7 292.6 314 301.4C294.9 313.7 266.9 317.5 245 321.5C228.4 324.6 217.6 323.3 203.7 333C198.9 336.3 195.5 341.3 191.4 345.5L185.7 356L150.6 437L109.6 437Z"/></symbol>
+        <path id="arcpath" d="M24 146A104 104 0 0 1 128 42"/>
+    </defs>
+</svg>
+<div id="installer">
+    <div id="stage" data-state="idle" data-installed="">
+        <div id="art">
+            <div id="halftone" class="in" style="--d:.1s"></div>
+            <svg id="arc" class="in" style="--d:.05s" viewBox="0 0 200 200" aria-hidden="true">
+                <defs><mask id="arcfill" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><path id="arcdash" d="M24 146A104 104 0 0 1 128 42" fill="none" stroke="#fff" stroke-width="44" pathLength="100" style="stroke-dasharray:0 100"/></mask></defs>
+                <path class="guide" d="M30 146A98 98 0 0 1 128 48"/>
+                <path class="ticks" d="M44 146A84 84 0 0 1 128 62"/>
+                <g class="ghost">
+                    <text><textPath href="#arcpath" startOffset="50%" text-anchor="middle" data-k="brand"></textPath></text>
+                </g>
+                <g class="lit" mask="url(#arcfill)">
+                    <text><textPath href="#arcpath" startOffset="50%" text-anchor="middle" data-k="brand"></textPath></text>
+                </g>
+            </svg>
+            <div id="emblem" class="in" style="--d:.2s">
+                <svg id="rings" viewBox="0 0 360 360">
+                    <circle class="r4" cx="180" cy="180" r="178"/>
+                    <circle class="r1" cx="180" cy="180" r="168"/>
+                    <circle class="r3" cx="180" cy="180" r="150"/>
+                    <circle class="r2" cx="180" cy="180" r="168"/>
+                    <line x1="180" y1="-14" x2="180" y2="12"/>
+                    <line x1="180" y1="348" x2="180" y2="374"/>
+                    <line x1="-14" y1="180" x2="12" y2="180"/>
+                    <line x1="348" y1="180" x2="374" y2="180"/>
+                </svg>
+                <span class="sweep"></span>
+                <span class="burst"></span>
+                <svg class="glyph ghost" viewBox="0 0 461 438"><use href="#glyph"/></svg>
+                <svg class="glyph fill" viewBox="0 0 461 438"><defs><clipPath id="lvl"><rect width="461" height="438"/></clipPath></defs><g clip-path="url(#lvl)"><use href="#glyph"/></g></svg>
+                <svg class="glyph line" viewBox="0 0 461 438"><use href="#glyph"/></svg>
+                <span class="level"><b data-v="lvl"></b></span>
+            </div>
+            <div id="brand" class="in" style="--d:.15s">
+                <h1 data-k="brand"></h1>
+                <small><span data-k="build"></span><span data-v="version"></span><i></i><span data-k="platform"></span></small>
+            </div>
+            <div id="clock" class="in" style="--d:.25s">
+                <div class="t"><span id="sig"><i></i><i></i><i></i><i></i><i></i></span><span data-c="time"></span><b data-c="ap"></b></div>
+                <div class="d"><span data-c="date"></span><span data-k="zone"></span></div>
+                <div class="d r" data-c="reg"></div>
+            </div>
+            <div id="tag"><div class="chip"><span data-tag></span></div></div>
+            <svg id="cipher" class="in" style="--d:.45s" viewBox="0 120 170 190" aria-hidden="true">
+                <defs><clipPath id="cipherclip"><path d="M105 120H156V298H-6Z"/></clipPath></defs>
+                <path class="tri"/>
+                <g class="cons" clip-path="url(#cipherclip)"></g>
+                <path class="ang"/><path class="ang"/><path class="ang"/>
+                <text class="deg"/><text class="deg"/><text class="deg"/>
+                <path class="sq"/>
+                <circle class="v" r="2.2"/><circle class="v" r="2.2"/><circle class="v" r="2.2"/>
+                <text class="role" text-anchor="middle">MSG</text><text class="role" text-anchor="middle">DEK</text><text class="role" text-anchor="middle">KEK</text>
+                <g class="pyth">
+                    <text x="93" y="288" text-anchor="middle">IV 12</text>
+                    <text x="146" y="216" text-anchor="middle" transform="rotate(-90 146 216)">TAG 16</text>
+                    <text class="eq" x="85" y="208" text-anchor="middle" transform="rotate(-53.13 85 208)">12² + 16² = 20²</text>
+                    <text x="77" y="198" text-anchor="middle" transform="rotate(-53.13 77 198)">AES-256-GCM</text>
+                </g>
+                <text class="k" text-anchor="middle">K</text>
+                <text class="key" text-anchor="middle" data-key></text>
+            </svg>
+            <div id="chunks" class="in" style="--d:.35s"></div><span></span>
+            <dl id="manifest" class="in" style="--d:.4s">
+                <div><dt data-k="file"></dt><dd data-d="file"></dd></div>
+                <div><dt data-k="size"></dt><dd><span data-d="bytes"></span> <span data-k="b"></span></dd></div>
+                <div><dt data-k="unpacked"></dt><dd><span data-d="unpacked"></span> <span data-k="mb"></span> · <span data-d="files"></span> <span data-k="files"></span></dd></div>
+                <div><dt data-k="build"></dt><dd data-d="date"></dd></div>
+                <div class="sha"><dt data-k="sha"></dt><dd data-d="sha"></dd></div>
+            </dl>
+            <span class="cross" style="right:30px;top:150px"></span>
+            <span class="cross" style="right:30px;top:390px"></span>
+            <div class="tape warn"></div>
+            <div class="tape main"><div data-tape></div></div>
+            <div class="tape rise"><div data-tape></div></div>
+            <div id="coord"><span data-k="jdn"></span><span data-c="jdn"></span></div>
+            <div id="ruler"></div>
+            <span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>
+            <div id="alarm"></div>
+        </div>
+        <div id="rig">
+            <div id="deploy" role="button" tabindex="0">
+                <div class="head">
+                    <i class="notch l"></i><i class="notch r"></i>
+                    <svg viewBox="0 0 461 438" aria-hidden="true"><use href="#glyph"/></svg>
+                    <div><b data-label></b><em><span class="ver"><span data-v="version"></span> · </span><span data-cache></span><span data-v="total"></span> <span data-k="mb"></span><span class="why" data-why></span></em></div>
+                    <div class="prompt">
+                        <span data-k="sure"></span>
+                        <div><button class="kill" type="button" data-k="uninstall"></button><button class="back" type="button" data-k="cancel"></button></div>
+                    </div>
+                </div>
+                <button class="snip" type="button" disabled><svg viewBox="0 0 24 24"><g class="b1"><circle cx="6" cy="6" r="3"/><path d="M8.2 8.2L21 19"/></g><g class="b2"><circle cx="6" cy="18" r="3"/><path d="M8.2 15.8L21 5"/></g></svg></button>
+                <div class="body">
+                <i class="notch l"></i><i class="notch r"></i>
+                <div class="hazard"></div>
+                <div class="tall">
+                    <div class="chev">
+                        <svg viewBox="0 0 34 20"><path d="M3 3l14 13L31 3"/></svg>
+                        <svg viewBox="0 0 34 20"><path d="M3 3l14 13L31 3"/></svg>
+                        <svg viewBox="0 0 34 20"><path d="M3 3l14 13L31 3"/></svg>
+                        <svg viewBox="0 0 34 20"><path d="M3 3l14 13L31 3"/></svg>
+                    </div>
+                    <strong data-k="install"></strong><strong class="o" data-k="install"></strong><strong class="u" data-k="uninstall"></strong><strong class="u o" data-k="uninstall"></strong>
+                    <label class="wipe"><input type="checkbox"><i></i><span data-k="wipe"></span></label>
+                    <div class="spec">
+                        <span data-k="total"></span><span><b data-v="total"></b> <span data-k="mb" style="display:inline;border:0"></span></span>
+                        <span data-k="platform"></span>
+                    </div>
+                    <div class="stub"><div data-code></div><span data-code-text></span></div>
+                </div>
+                </div>
+            </div>
+            <section id="console">
+                <div class="phase" style="--i:0"><span data-phase></span><span class="mono" data-v="step"></span></div>
+                <div class="big" style="--i:1">
+                    <div class="pct"><span data-v="pi">0</span><small>.<span data-v="pd">0</span>%</small></div>
+                    <div class="bytes"><span data-v="fetched">0.0</span><br><span>/ <span data-v="total"></span> <span data-k="mb"></span></span></div>
+                </div>
+                <div class="segs" style="--i:2"></div>
+                <div class="speed" style="--i:3">
+                    <div class="top"><span class="label" data-k="speed"></span><b data-v="speed">0.0</b><span class="mono" data-k="mbs"></span><span class="mono peak"><span data-k="peak"></span> <span data-v="peak">0.0</span></span></div>
+                    <svg viewBox="0 0 100 38" preserveAspectRatio="none"><path d=""/><polyline points=""/></svg>
+                </div>
+                <div class="stats" style="--i:4">
+                    <div><span class="label" data-k="eta"></span><b data-v="eta">--:--</b></div>
+                    <div><span class="label" data-k="files"></span><b data-v="files">0</b></div>
+                    <div><span class="label" data-k="disk"></span><b><span data-v="disk"></span> <span data-k="mb"></span></b></div>
+                    <div><span class="label" data-k="free"></span><b><span data-v="free"></span> <span data-k="gb"></span></b></div>
+                </div>
+                <ol class="steps" style="--i:5">
+                    <li><span class="mono">01</span><span data-k="s_fetch"></span></li>
+                    <li><span class="mono">02</span><span data-k="s_verify"></span></li>
+                    <li><span class="mono">03</span><span data-k="s_extract"></span></li>
+                    <li><span class="mono">04</span><span data-k="s_link"></span></li>
+                </ol>
+                <div style="--i:6">
+                    <div class="label" data-k="path" style="margin-bottom:5px"></div>
+                    <div class="path"><span data-v="path"></span><button type="button"><svg viewBox="0 0 24 24"><path d="M2 5h8l2 2h10v13H2z"/></svg></button></div>
+                </div>
+                <div class="ctl" style="--i:7">
+                    <button class="hold" type="button" data-hold></button>
+                    <button class="stop" type="button" data-k="cancel"></button>
+                    <button class="go" type="button" data-k="launch"></button>
+                </div>
+            </section>
+        </div>
+        <div id="space">
+            <div class="card">
+                <b data-k="space"></b>
+                <div class="rows">
+                    <span data-k="disk"></span><span><i data-sp="need"></i> <span data-k="gb"></span></span>
+                    <span data-k="free"></span><span><i data-sp="free"></i> <span data-k="gb"></span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="bar">
+        <div id="win">
+            <button class="min" type="button"><svg viewBox="0 0 10 10"><path d="M1 5h8"/></svg></button>
+            <button class="shut" type="button"><svg viewBox="0 0 10 10"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/></svg></button>
+        </div>
+        <img id="arms" src="downloadlogo.png" alt="">
+        <button class="item selected" type="button">
+            <svg viewBox="0 0 461 438" aria-hidden="true"><path fill-rule="evenodd" d="M87.4 435.5C90.9 429.9 92.3 423.4 95.2 417.5C106 395.8 113.3 372.3 124.2 350.5C131.3 336.4 136 320.8 143.2 306.5C146.6 299.7 151.7 291.1 153.2 283.5C159 279.5 173.5 282.1 180.5 282C199.8 281.9 219.3 282.5 238.5 280.9C273.5 278.1 308.6 268 339.5 252C350.7 246.1 360.7 238.6 371.2 231.5C389.3 219.2 407 201.8 419 183.5C434.2 160.4 446.5 136.8 454.2 110.5C462.2 83 463.4 52.8 441.5 30.9C430.4 19.8 415 14 400.5 9.8C367.2 0.3 331.5 1 296.5 1C272.5 1 248.5 1 224.5 1C216.5 1 208.5 1.6 200.5 1.8C197.2 2 191.4 0.9 188.6 2.5C184.1 9.5 182.4 18.1 178.7 25.5C168.2 46.6 159.8 69.2 150 90.5C147.3 96.3 145.7 102.8 142.8 108.5C131.9 130.2 124.7 153.7 113.8 175.5C106.7 189.7 101.9 205.2 94.8 219.5C88.8 231.4 84.7 244.5 78.7 256.5C64.7 284.5 53.9 314.3 41 342.5C30.9 364.6 21.6 387.2 12 409.5C8.4 418.1 5.6 427.4 1 435.5C2.2 436.7 5.8 436.1 7.5 436.3C16.8 437.3 26.1 437 35.5 437.1C46.5 437.2 57.5 437 68.5 437C73.5 437 83 437.9 87.4 435.5ZM184.5 212.8C188.3 201.4 194.1 190.5 198.9 179.5C206.5 161.8 213.9 143.9 221.8 126.5C228.2 112.6 233.7 98.4 240 84.5C241.9 80.3 243.1 73.8 246.4 70.5C249.9 69.3 254.8 70.1 258.5 70.1C266.8 70 275.2 69.9 283.5 70C304.6 70.1 326.8 69.5 346.5 77.9C354.9 81.4 363.3 87.2 365.9 96.5C370.3 112 363.4 128.8 357 142.5C343.4 172 320.1 194.4 289.5 205.8C275.5 211 260.4 212.3 245.5 213.3C231.5 214.2 217.5 214 203.5 213.8C198.7 213.8 188.6 215.4 184.5 212.8Z"/><path d="M172 293L203.2 293L197.5 317.4C207.7 310.5 220.1 298.6 232.3 295.1C257.7 287.7 282.8 286.1 308 276.2C321 271.1 332.4 262.5 344.8 256C341.4 261.3 337.7 266.5 334.6 272C327.1 285.3 327.7 292.6 314 301.4C294.9 313.7 266.9 317.5 245 321.5C228.4 324.6 217.6 323.3 203.7 333C198.9 336.3 195.5 341.3 191.4 345.5L185.7 356L150.6 437L109.6 437Z"/></svg>
+        </button>
+    </div>
+</div>
+<script type="application/json" id="lang">
+{
+    "brand": "PRONO",
+    "build": "BUILD",
+    "platform": "WIN · X64",
+    "caution": "AUTHORISED DEPLOYMENT",
+    "update": "UPDATE EXISTS",
+    "uptodate": "UP TO DATE",
+    "install": "INSTALL",
+    "installing": "INSTALLING",
+    "installed": "INSTALLED",
+    "total": "TOTAL SIZE",
+    "speed": "SPEED",
+    "peak": "PEAK",
+    "eta": "ETA",
+    "files": "FILES",
+    "disk": "ON DISK",
+    "free": "FREE",
+    "path": "INSTALL PATH",
+    "s_fetch": "FETCH",
+    "s_verify": "VERIFY",
+    "s_extract": "EXTRACT",
+    "s_link": "LINK",
+    "paused": "PAUSED",
+    "complete": "COMPLETE",
+    "pause": "PAUSE",
+    "resume": "RESUME",
+    "cancel": "CANCEL",
+    "launch": "LAUNCH",
+    "uninstall": "UNINSTALL",
+    "sure": "ARE YOU SURE",
+    "file": "FILE",
+    "size": "SIZE",
+    "unpacked": "UNPACKED",
+    "sha": "SHA-256",
+    "zone": "JST",
+    "jdn": "JDN",
+    "mb": "MB",
+    "mbs": "MB/s",
+    "gb": "GB",
+    "b": "B",
+    "wipe": "WIPE DATA",
+    "upgrade": "UPDATE",
+    "error": "ERROR",
+    "e_net": "NO CONNECTION",
+    "e_hash": "FILE DAMAGED",
+    "e_busy": "FOLDER IN USE",
+    "e_run": "PRONO IS RUNNING",
+    "e_fail": "DOWNLOAD FAILED",
+    "space": "NOT ENOUGH SPACE"
+}
+</script>
+<script src="/js/time.js"></script>
+<script>
+(() => {
+    const L = JSON.parse(document.getElementById('lang').textContent);
+    let D = { file: 'Prono Setup 1.0.8.exe', version: '1.0.8', date: '20261005', bytes: 111738362, unpacked: 385668147, files: 73, sha: '1599a85706f39ea99cb02ec4e44844364f1c6ceabb76dab5ad4efd2d70298108' };
+    let S = { installed: null, free: 214.6, path: '%LOCALAPPDATA%\\Programs\\Prono' };
+    let TOTAL = D.bytes / 1e6, DISK = D.unpacked / 1e6;
+    const H = window.hub;
+    const older = (a, b) => {
+        const x = String(a || '').split('.').map(Number), y = String(b || '').split('.').map(Number);
+        for (let i = 0; i < Math.max(x.length, y.length); i++) {
+            if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+        }
+        return false;
+    };
+    const stale = () => Boolean(S.installed) && older(S.installed, D.version);
+    if (H) {
+        document.documentElement.classList.add('hubbed');
+        document.querySelector('#win .min').addEventListener('click', () => H.minimize());
+        document.querySelector('#win .shut').addEventListener('click', () => H.close());
+        document.getElementById('arms').addEventListener('click', () => H.board());
+        document.getElementById('art').addEventListener('mousedown', e => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            H.drag(true);
+        });
+        window.addEventListener('mouseup', () => H.drag(false));
+        window.addEventListener('blur', () => H.drag(false));
+    }
+    const PHASE = { fetch: [0, .7], verify: [.7, .8], extract: [.8, .95], link: [.95, 1] };
+    const STEPS = [['s_fetch', .7], ['s_verify', .8], ['s_extract', .95], ['s_link', 1]];
+    const SEGS = 28, HIST = 48, CHUNKS = 80;
+    const C39 = { '*': '010010100', P: '001010010', R: '100000110', O: '100010010', N: '000010011' };
+
+    const stage = document.getElementById('stage');
+    const deploy = document.getElementById('deploy');
+    const art = document.getElementById('art');
+    const emblem = document.getElementById('emblem');
+    const tag = document.getElementById('tag');
+    const arcdash = document.getElementById('arcdash');
+    const $ = s => stage.querySelector(s);
+    const $$ = s => stage.querySelectorAll(s);
+    const put = (k, v) => $$(`[data-v="${k}"]`).forEach(n => n.textContent = v);
+    const C = (k, v) => art.querySelectorAll(`[data-c="${k}"]`).forEach(n => n.textContent = v);
+    const group = n => n.toLocaleString('en-US').replace(/,/g, ' ');
+
+    const code39 = (text, n, w, h) => {
+        let x = 0, bars = '';
+        for (const ch of text) {
+            [...C39[ch]].forEach((bit, i) => {
+                const width = bit === '1' ? w : n;
+                if (i % 2 === 0) bars += `<rect x="${x}" y="0" width="${width}" height="${h}"/>`;
+                x += width;
+            });
+            x += n;
+        }
+        x -= n;
+        return `<svg width="${x}" height="${h}" viewBox="0 0 ${x} ${h}">${bars}</svg>`;
+    };
+
+    document.querySelectorAll('[data-k]').forEach(n => n.textContent = L[n.dataset.k]);
+    const fill = () => {
+    const strip = `${L.brand} // ${D.date} ${D.version} // ${D.sha.toUpperCase()} // `;
+    $$('[data-tape]').forEach(n => n.textContent = strip.repeat(4));
+    $('[data-code]').innerHTML = code39(`*${L.brand}*`, 2, 5, 30);
+    $('[data-code-text]').textContent = `*${L.brand}*`;
+    art.querySelector('[data-d="file"]').textContent = D.file;
+    art.querySelector('[data-d="bytes"]').textContent = group(D.bytes);
+    art.querySelector('[data-d="unpacked"]').textContent = DISK.toFixed(1);
+    art.querySelector('[data-d="files"]').textContent = D.files;
+    art.querySelector('[data-d="date"]').textContent = D.date;
+    art.querySelector('[data-d="sha"]').innerHTML = D.sha.toUpperCase().match(/.{8}/g).map(g => `<span>${g}</span>`).join('');
+    put('version', D.version);
+    put('total', TOTAL.toFixed(1));
+    put('disk', DISK.toFixed(1));
+    put('free', S.free.toFixed(1));
+    put('path', S.path);
+    };
+    fill();
+
+    const segs = $('.segs');
+    for (let i = 0; i < SEGS; i++) segs.appendChild(document.createElement('i'));
+    const chunks = $('#chunks');
+    for (let i = 0; i < CHUNKS; i++) chunks.appendChild(document.createElement('i'));
+    const sig = $$('#sig i');
+    const line = $('.speed polyline'), area = $('.speed path');
+    const steps = $$('.steps li');
+    const snip = $('.snip');
+
+    const clock = () => {
+        const n = propertime();
+        const a = n.toAltFormats();
+        C('time', `${n.hr}:${n.min}:${n.sec}`);
+        C('ap', n.ampm);
+        C('date', a[6]);
+        C('reg', a[19]);
+        C('jdn', propertime.toJDN(n.year, n.month, n.day));
+    };
+    clock();
+    setInterval(clock, 1000);
+
+    const keyShard = () => [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
+    const keyText = art.querySelector('[data-key]');
+    const scramble = (el, text) => {
+        const noise = '/\\<>_-=+#01▮';
+        const els = el instanceof Element ? [el] : [...el];
+        const lead = els[0];
+        let f = 0;
+        clearInterval(lead.scrambler);
+        lead.scrambler = setInterval(() => {
+            f++;
+            const k = Math.floor(f / 18 * text.length);
+            const s = f >= 18 ? text : text.slice(0, k) + [...text.slice(k)].map(c => c === ' ' ? ' ' : noise[Math.random() * noise.length | 0]).join('');
+            els.forEach(n => { n.textContent = s; });
+            if (f >= 18) clearInterval(lead.scrambler);
+        }, 40);
+    };
+    const morph = (els, text) => {
+        if (els[0].dataset.w === text) return;
+        els.forEach(n => { n.dataset.w = text; });
+        scramble(els, text);
+    };
+    const reword = () => {
+        const u = $$('.tall .u');
+        u.forEach(n => { n.dataset.w = ''; });
+        morph(u, L.uninstall);
+    };
+    const unword = () => {
+        const w = $$('.tall strong:not(.u)');
+        const t = w[0].dataset.w;
+        w.forEach(n => { n.dataset.w = ''; });
+        morph(w, t);
+    };
+    const reKey = () => scramble(keyText, keyShard());
+    reKey();
+    setInterval(reKey, 3000);
+
+    const geo = (() => {
+        const NS = 'http://www.w3.org/2000/svg';
+        const svg = art.querySelector('#cipher');
+        const q = sel => [...svg.querySelectorAll(sel)];
+        const cons = svg.querySelector('.cons');
+        const tri = svg.querySelector('.tri');
+        const ang = q('.ang'), deg = q('.deg'), vtx = q('.v'), role = q('.role');
+        const sq = svg.querySelector('.sq'), pyth = svg.querySelector('.pyth');
+        const kText = svg.querySelector('.k');
+        const SHAPES = [
+            [[36, 292], [150, 292], [150, 140]],
+            [[34, 286], [148, 268], [122, 152]],
+            [[22, 288], [150, 284], [62, 246]],
+            [[84, 292], [148, 292], [116, 148]],
+            [[38, 290], [146, 290], [92, 196.5]]
+        ];
+        const clamp = v => Math.max(0, Math.min(1, v));
+        const ease = v => v < .5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2;
+        const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+        const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
+        const mul = (a, k) => [a[0] * k, a[1] * k];
+        const len = a => Math.hypot(a[0], a[1]);
+        const unit = a => mul(a, 1 / (len(a) || 1));
+        const lerp = (a, b, k) => add(a, mul(sub(b, a), k));
+        const mid = (a, b) => lerp(a, b, .5);
+        const cross = (u, w) => u[0] * w[1] - u[1] * w[0];
+        const dotp = (u, w) => u[0] * w[0] + u[1] * w[1];
+        const rot = (v, t) => [v[0] * Math.cos(t) - v[1] * Math.sin(t), v[0] * Math.sin(t) + v[1] * Math.cos(t)];
+        const meet = (p, d, r, e) => {
+            const den = cross(d, e);
+            if (Math.abs(den) < 1e-9) return p;
+            return add(p, mul(d, cross(sub(r, p), e) / den));
+        };
+        const foot = (v, x, y) => {
+            const xy = sub(y, x);
+            return add(x, mul(xy, dotp(sub(v, x), xy) / (dotp(xy, xy) || 1)));
+        };
+
+        const pools = { line: [], ring: [], path: [], dot: [], text: [] };
+        const used = {};
+        const take = (kind, tag) => {
+            const pool = pools[kind];
+            let n = pool[used[kind]];
+            if (!n) {
+                n = document.createElementNS(NS, tag);
+                if (kind === 'ring' || kind === 'path') n.setAttribute('pathLength', '1');
+                cons.appendChild(n);
+                pool.push(n);
+            }
+            used[kind]++;
+            n.style.display = '';
+            return n;
+        };
+        let alpha = 1;
+        const L = (a, b, k, cls) => {
+            if (k <= 0) return;
+            const n = take('line', 'line');
+            const e = lerp(a, b, k);
+            n.setAttribute('class', cls);
+            n.setAttribute('x1', a[0]); n.setAttribute('y1', a[1]);
+            n.setAttribute('x2', e[0]); n.setAttribute('y2', e[1]);
+            n.style.opacity = alpha;
+        };
+        const C = (c, r, k, cls) => {
+            if (k <= 0 || !(r > 0)) return;
+            const n = take('ring', 'circle');
+            n.setAttribute('class', `c ${cls}`);
+            n.setAttribute('cx', c[0]); n.setAttribute('cy', c[1]); n.setAttribute('r', r);
+            n.style.strokeDasharray = `${k} 1`;
+            n.style.opacity = alpha;
+        };
+        const P = (pts, k, cls) => {
+            if (k <= 0) return;
+            const n = take('path', 'path');
+            n.setAttribute('class', `c ${cls}`);
+            n.setAttribute('d', `M${pts.join('L')}Z`);
+            n.style.strokeDasharray = `${k} 1`;
+            n.style.fillOpacity = k;
+            n.style.opacity = alpha;
+        };
+        const D = (p, label, k, cls = '') => {
+            if (k < 1) return;
+            const n = take('dot', 'circle');
+            n.setAttribute('class', `ctr ${cls}`);
+            n.setAttribute('r', cls ? 1.4 : 1.8);
+            n.setAttribute('cx', p[0]); n.setAttribute('cy', p[1]);
+            n.style.opacity = alpha;
+            if (!label) return;
+            const t = take('text', 'text');
+            t.setAttribute('class', 'cl');
+            t.setAttribute('x', p[0] + 3); t.setAttribute('y', p[1] - 3);
+            t.textContent = label;
+            t.style.opacity = alpha;
+        };
+
+        const ACTS = [
+            {
+                key: 'bis',
+                steps: [['med', 800], ['perp', 800], ['circ', 700], ['bis', 800], ['inc', 600], ['alt', 800], ['eul', 700]],
+                draw(k, g) {
+                    const span = (v, f, h) => {
+                        const d = sub(f, v);
+                        const th = dotp(d, d) ? dotp(sub(h, v), d) / dotp(d, d) : 0;
+                        return [add(v, mul(d, Math.min(0, th))), add(v, mul(d, Math.max(1, th)))];
+                    };
+                    g.V.forEach((V, i) => {
+                        const [X, Y] = g.opp[i];
+                        L(V, mid(X, Y), k('med'), 'med');
+                        L(mid(X, Y), g.O, k('perp'), 'perp');
+                        const lx = len(sub(X, V)), ly = len(sub(Y, V));
+                        L(V, lerp(X, Y, lx / (lx + ly || 1)), k('bis'), 'bis');
+                        const [s0, s1] = span(V, foot(V, X, Y), g.H);
+                        L(s0, s1, k('alt'), 'alt');
+                    });
+                    C(g.O, g.R, k('circ'), 'circ');
+                    C(g.I, g.r, k('inc'), 'inc');
+                    const eu = sub(g.O, g.H);
+                    if (len(eu) > 2) L(sub(g.H, mul(eu, .25)), add(g.O, mul(eu, .25)), k('eul'), 'eul');
+                    D(g.G, 'G', k('med'));
+                    D(g.O, 'O', k('perp'));
+                    D(g.H, 'H', k('alt'));
+                }
+            },
+            {
+                key: null,
+                steps: [['mids', 600], ['feet', 800], ['half', 800], ['nine', 900], ['eul', 700]],
+                draw(k, g) {
+                    g.V.forEach((V, i) => {
+                        const [X, Y] = g.opp[i];
+                        D(mid(X, Y), null, k('mids'), 'm');
+                        const F = foot(V, X, Y);
+                        L(V, F, k('feet'), 'alt');
+                        D(F, null, k('feet'), 'm');
+                        L(V, g.H, k('half'), 'half');
+                        D(mid(V, g.H), null, k('half'), 'm');
+                    });
+                    const N = mid(g.O, g.H);
+                    C(N, g.R / 2, k('nine'), 'nine');
+                    D(N, 'N', k('nine'));
+                    const eu = sub(g.O, g.H);
+                    if (len(eu) > 2) L(sub(g.H, mul(eu, .2)), add(g.O, mul(eu, .2)), k('eul'), 'eul');
+                    D(g.O, 'O', k('eul'));
+                    D(g.H, 'H', k('eul'));
+                }
+            },
+            {
+                key: null,
+                steps: [['tris', 1300], ['eq', 900]],
+                draw(k, g) {
+                    const ray = (V, X, Y) => {
+                        const u = unit(sub(X, V)), w = unit(sub(Y, V));
+                        const th = Math.acos(Math.max(-1, Math.min(1, dotp(u, w))));
+                        return rot(u, Math.sign(cross(u, w)) * th / 3);
+                    };
+                    const [A, B, Cc] = g.V;
+                    const pt = (X, Y, Z) => meet(X, ray(X, Y, Z), Y, ray(Y, X, Z));
+                    const Ma = pt(B, Cc, A), Mb = pt(Cc, A, B), Mc = pt(A, B, Cc);
+                    [[B, Ma], [Cc, Ma], [Cc, Mb], [A, Mb], [A, Mc], [B, Mc]].forEach(([V, M]) => L(V, M, k('tris'), 'tris'));
+                    P([Ma, Mb, Mc], k('eq'), 'eqt');
+                    [Ma, Mb, Mc].forEach(M => D(M, null, k('tris'), 'm'));
+                }
+            },
+            {
+                key: null,
+                steps: [['l1', 550], ['l2', 550], ['l3', 550], ['l4', 550]],
+                draw(k, g) {
+                    let set = [g.V];
+                    ['l1', 'l2', 'l3', 'l4'].forEach(lv => {
+                        const next = [];
+                        set.forEach(([X, Y, Z]) => {
+                            const a = mid(X, Y), b = mid(Y, Z), c = mid(Z, X);
+                            P([a, b, c], k(lv), 'hole');
+                            next.push([X, a, c], [a, Y, b], [c, b, Z]);
+                        });
+                        set = next;
+                    });
+                }
+            },
+            {
+                key: 'inc',
+                steps: [['inc', 800], ['touch', 600], ['cev', 900], ['ctri', 700]],
+                draw(k, g) {
+                    const [A, B, Cc] = g.V;
+                    const sp = (g.a + g.b + g.c) / 2;
+                    const Ta = lerp(B, Cc, (sp - g.b) / (g.a || 1));
+                    const Tb = lerp(Cc, A, (sp - g.c) / (g.b || 1));
+                    const Tc = lerp(A, B, (sp - g.a) / (g.c || 1));
+                    C(g.I, g.r, k('inc'), 'inc');
+                    [Ta, Tb, Tc].forEach(T => D(T, null, k('touch'), 'm'));
+                    L(A, Ta, k('cev'), 'cev');
+                    L(B, Tb, k('cev'), 'cev');
+                    L(Cc, Tc, k('cev'), 'cev');
+                    D(meet(A, sub(Ta, A), B, sub(Tb, B)), 'Ge', k('cev'));
+                    P([Ta, Tb, Tc], k('ctri'), 'ctri');
+                }
+            }
+        ];
+        ACTS.forEach(act => {
+            act.at = {};
+            let acc = 0;
+            [['morph', 1100], ...act.steps, ['hold', 1900], ['fade', 500]].forEach(([n, d]) => { act.at[n] = [acc, d]; acc += d; });
+            act.length = acc;
+        });
+
+        let start = null, n = 0;
+        const frame = now => {
+            requestAnimationFrame(frame);
+            if (start === null) start = now;
+            const act = () => ACTS[(n + Math.floor(n / SHAPES.length)) % ACTS.length];
+            while (now - start >= act().length) { start += act().length; n++; }
+            const A_ = act();
+            const t = Math.max(0, now - start);
+            const k = name => A_.at[name] ? clamp((t - A_.at[name][0]) / A_.at[name][1]) : 0;
+            const cur = SHAPES[n % SHAPES.length];
+            const prev = n === 0 ? cur.map(() => mul(add(add(cur[0], cur[1]), cur[2]), 1 / 3)) : SHAPES[(n - 1) % SHAPES.length];
+            const V = cur.map((p, i) => lerp(prev[i], p, ease(k('morph'))));
+            const [A, B, Cc] = V;
+            const a = len(sub(B, Cc)), b = len(sub(Cc, A)), c = len(sub(A, B));
+            const area = Math.abs(cross(sub(B, A), sub(Cc, A))) / 2;
+            const per = a + b + c || 1;
+            const G = mul(add(add(A, B), Cc), 1 / 3);
+            const I = mul(add(add(mul(A, a), mul(B, b)), mul(Cc, c)), 1 / per);
+            const d = 2 * (A[0] * (B[1] - Cc[1]) + B[0] * (Cc[1] - A[1]) + Cc[0] * (A[1] - B[1]));
+            const s2 = p => dotp(p, p);
+            const O = Math.abs(d) < 1e-6 ? G : [(s2(A) * (B[1] - Cc[1]) + s2(B) * (Cc[1] - A[1]) + s2(Cc) * (A[1] - B[1])) / d, (s2(A) * (Cc[0] - B[0]) + s2(B) * (A[0] - Cc[0]) + s2(Cc) * (B[0] - A[0])) / d];
+            const g = { V, a, b, c, G, I, r: 2 * area / per, O, R: len(sub(A, O)), H: sub(add(add(A, B), Cc), mul(O, 2)), opp: [[B, Cc], [Cc, A], [A, B]] };
+
+            Object.keys(pools).forEach(kind => { used[kind] = 0; });
+            alpha = 1 - k('fade');
+            A_.draw(k, g);
+            Object.keys(pools).forEach(kind => pools[kind].slice(used[kind]).forEach(e => { e.style.display = 'none'; }));
+
+            tri.setAttribute('d', `M${A}L${B}L${Cc}Z`);
+            let right = false;
+            V.forEach((P0, i) => {
+                const [X, Y] = g.opp[i];
+                const u = unit(sub(X, P0)), w = unit(sub(Y, P0));
+                const th = Math.acos(Math.max(-1, Math.min(1, dotp(u, w)))) * 180 / Math.PI;
+                const p1 = add(P0, mul(u, 11)), p2 = add(P0, mul(w, 11));
+                ang[i].setAttribute('d', `M${p1}A11 11 0 0 ${cross(u, w) > 0 ? 1 : 0} ${p2}`);
+                const bi = unit(add(u, w));
+                const lp = add(P0, mul(bi, 21));
+                deg[i].setAttribute('x', lp[0]); deg[i].setAttribute('y', lp[1] + 2);
+                deg[i].setAttribute('text-anchor', 'middle');
+                deg[i].textContent = `${th.toFixed(1)}°`;
+                vtx[i].setAttribute('cx', P0[0]); vtx[i].setAttribute('cy', P0[1]);
+                const rp = sub(P0, mul(bi, 13));
+                role[i].setAttribute('x', rp[0]); role[i].setAttribute('y', rp[1] + 3);
+                const isRight = Math.abs(th - 90) < .6;
+                ang[i].style.opacity = isRight ? 0 : 1;
+                deg[i].style.opacity = isRight ? 0 : 1;
+                if (isRight) {
+                    right = true;
+                    sq.setAttribute('d', `M${add(P0, mul(u, 7))}L${add(add(P0, mul(u, 7)), mul(w, 7))}L${add(P0, mul(w, 7))}`);
+                }
+            });
+            sq.style.opacity = right ? 1 : 0;
+            const kOn = A_.key && k(A_.key) >= 1 ? alpha : 0;
+            kText.setAttribute('x', I[0]); kText.setAttribute('y', I[1] + 5); kText.style.opacity = kOn;
+            keyText.setAttribute('x', I[0]); keyText.setAttribute('y', I[1] + 13); keyText.style.opacity = kOn;
+            pyth.classList.toggle('on', n % SHAPES.length === 0 && k('morph') >= 1 && k('fade') < 1);
+        };
+        requestAnimationFrame(frame);
+    })();
+    const boot = () => {
+        const key = stage.classList.contains('err') ? 'error' : !S.installed ? 'caution' : stale() ? 'update' : 'uptodate';
+        tag.dataset.s = key;
+        tag.classList.remove('boot');
+        void tag.offsetWidth;
+        tag.classList.add('boot');
+        scramble(tag.querySelector('[data-tag]'), L[key]);
+    };
+
+    let p, hist, peak, paused, timer, base;
+
+    const setState = s => {
+        stage.dataset.state = s;
+        stage.classList.toggle('upd', stale());
+        const err = stage.classList.contains('err') && s === 'idle';
+        const ok = Boolean(S.installed) && !stale() && !stage.classList.contains('err');
+        stage.classList.toggle('ok', ok);
+        $('[data-label]').textContent = L[err ? 'error' : s === 'idle' ? (stale() ? 'upgrade' : S.installed ? 'installed' : 'install') : s === 'done' ? 'installed' : 'installing'];
+        morph($$('.tall strong:not(.u)'), L[err ? 'error' : ok ? 'launch' : stale() && s === 'idle' ? 'upgrade' : 'install']);
+        $('[data-hold]').textContent = L[s === 'paused' ? 'resume' : 'pause'];
+    };
+
+    const render = speed => {
+        const step = STEPS.findIndex(([, end]) => p < end);
+        const si = step < 0 ? STEPS.length - 1 : step;
+        const pct = Math.min(p * 100, 100);
+        const got = Math.min(1, p / STEPS[0][1]);
+        const fetched = (got * TOTAL).toFixed(1);
+        put('pi', Math.floor(pct));
+        put('pd', Math.floor(pct * 10) % 10);
+        put('fetched', fetched);
+        put('lvl', (got * 100).toFixed(1));
+        put('speed', speed.toFixed(1));
+        put('peak', peak.toFixed(1));
+        put('files', `${Math.floor(Math.min(p, 1) * D.files)} / ${D.files}`);
+        put('step', `0${si + 1}/0${STEPS.length}`);
+        $('[data-cache]').textContent = p > 0 && p < 1 ? `${fetched} / ` : '';
+        const left = got < 1 ? (1 - got) * TOTAL / Math.max(speed, 1) + 6 : (1 - p) * 30;
+        put('eta', p >= 1 ? '00:00' : `${Math.floor(left / 60) < 10 ? '0' : ''}${Math.floor(left / 60)}:${Math.floor(left % 60) < 10 ? '0' : ''}${Math.floor(left % 60)}`);
+        $('[data-phase]').textContent = stage.dataset.state === 'done' ? L.complete : stage.dataset.state === 'paused' ? L.paused : L[STEPS[si][0]];
+        steps.forEach((li, i) => li.className = p >= 1 || i < si ? 'done' : i === si ? 'now' : '');
+        const on = Math.round(pct / 100 * SEGS);
+        [...segs.children].forEach((s, i) => s.className = i < on ? 'on' : i === on && p < 1 ? 'tip' : '');
+        const max = Math.max(peak, 1) * 1.15;
+        const pts = hist.map((v, i) => `${(i / (HIST - 1) * 100).toFixed(2)},${(38 - v / max * 36).toFixed(2)}`);
+        line.setAttribute('points', pts.join(' '));
+        area.setAttribute('d', `M0,38 L${pts.join(' L')} L100,38 Z`);
+        emblem.style.setProperty('--f', got);
+        emblem.classList.toggle('filling', got > 0 && got < 1);
+        const ch = Math.floor(got * CHUNKS);
+        [...chunks.children].forEach((c, i) => c.className = i < ch ? 'on' : i === ch && got < 1 && stage.dataset.state === 'running' ? 'tip' : '');
+        const bars = Math.ceil(speed / Math.max(peak, 1) * sig.length);
+        sig.forEach((b, i) => b.classList.toggle('on', i < bars));
+        arcdash.style.strokeDasharray = `${pct} 100`;
+    };
+
+    const tick = () => {
+        if (paused) { hist.push(0); hist.shift(); render(0); return; }
+        let speed = 0;
+        if (p < STEPS[0][1]) {
+            base = Math.max(6, Math.min(30, base + (Math.random() - .5) * 4));
+            speed = Math.max(0, base + (Math.random() - .5) * 6);
+            p += speed * .25 / TOTAL * STEPS[0][1];
+        } else {
+            p += .25 / 30;
+        }
+        peak = Math.max(peak, speed);
+        hist.push(speed); hist.shift();
+        if (p >= 1) finish();
+        render(speed);
+    };
+
+    const finish = () => {
+        p = 1;
+        clearInterval(timer);
+        S.installed = D.version;
+        stage.dataset.installed = '1';
+        snip.disabled = false;
+        setState('done');
+        boot();
+        emblem.classList.remove('pop');
+        void emblem.offsetWidth;
+        emblem.classList.add('pop');
+    };
+
+    const halt = () => {
+        clearInterval(timer);
+        stage.classList.remove('open');
+        p = Math.min(p, STEPS[0][1]);
+        paused = false;
+        hist = Array(HIST).fill(0);
+        setState('idle');
+        render(0);
+    };
+
+    const mend = () => {
+        $('.wipe input').checked = false;
+        stage.classList.add('mend');
+        stage.classList.remove('cut', 'snipping');
+        setTimeout(() => {
+            stage.classList.remove('mend');
+            unword();
+        }, 900);
+    };
+
+    const wipe = () => {
+        clearInterval(timer);
+        p = 0; peak = 0; paused = false; base = 18;
+        hist = Array(HIST).fill(0);
+        setState('idle');
+        render(0);
+    };
+
+    const fault = code => {
+        clearInterval(timer);
+        stage.classList.remove('open', 'cut', 'snipping', 'severed', 'mend', 'nospace');
+        stage.classList.add('err');
+        $('[data-why]').textContent = L[`e_${code}`] || L.e_fail;
+        $('.wipe input').checked = false;
+        p = code === 'hash' ? 0 : Math.min(p, STEPS[0][1]);
+        paused = false;
+        hist = Array(HIST).fill(0);
+        setState('idle');
+        render(0);
+        boot();
+    };
+
+    const roomless = sp => {
+        $('[data-sp="need"]').textContent = sp.need.toFixed(2);
+        $('[data-sp="free"]').textContent = sp.free.toFixed(2);
+        stage.classList.add('nospace');
+    };
+    $('#space').addEventListener('click', () => stage.classList.remove('nospace'));
+
+    const start = async () => {
+        if (stage.classList.contains('open') || stage.classList.contains('cut') || stage.classList.contains('err')) return;
+        if (stage.classList.contains('ok') && H) {
+            H.launch();
+            return;
+        }
+        if (p >= 1) {
+            stage.classList.add('open');
+            return;
+        }
+        if (H) {
+            setState('running');
+            const r = await H.start().catch(() => ({ ok: false, code: 'fail' }));
+            if (!r || !r.ok) {
+                setState('idle');
+                render(0);
+                if (r && r.space) roomless(r.space);
+                else fault((r && r.code) || 'fail');
+                return;
+            }
+            stage.classList.add('open');
+            return;
+        }
+        stage.classList.add('open');
+        setState('running');
+        timer = setInterval(tick, 250);
+    };
+    deploy.addEventListener('click', e => {
+        if (e.target.closest('.snip, .prompt, .wipe') || stage.classList.contains('lock')) return;
+        if (stage.classList.contains('err')) {
+            stage.classList.remove('err');
+            boot();
+        }
+        start();
+    });
+    deploy.addEventListener('keydown', e => {
+        if (e.target === deploy && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); start(); }
+    });
+    $('[data-hold]').addEventListener('click', () => {
+        paused = !paused;
+        setState(paused ? 'paused' : 'running');
+        if (H) paused ? H.pause() : H.resume();
+        render(0);
+    });
+    $('.stop').addEventListener('click', () => {
+        if (H) H.cancel();
+        halt();
+    });
+    $('.go').addEventListener('click', () => { if (H) H.launch(); });
+    $('.path button').addEventListener('click', async () => {
+        if (!H || stage.dataset.state !== 'idle') return;
+        const r = await H.choosePath();
+        if (!r) return;
+        S.path = r.path;
+        S.free = r.free;
+        put('path', S.path);
+        put('free', S.free.toFixed(1));
+    });
+    if (H) {
+        H.onProgress(m => {
+            if (stage.dataset.state === 'idle' || stage.dataset.state === 'done') return;
+            const [a, b] = PHASE[m.phase];
+            p = a + (b - a) * m.frac;
+            peak = Math.max(peak, m.speed);
+            hist.push(m.speed); hist.shift();
+            render(m.speed);
+        });
+        H.onDone(() => {
+            if (stage.dataset.state === 'idle') return;
+            finish();
+            render(0);
+        });
+        H.onError(m => {
+            if (stage.dataset.state !== 'idle') fault(m && m.code);
+        });
+        H.onAskUninstall(() => {
+            if (!S.installed || stage.classList.contains('cut') || stage.classList.contains('snipping') || ['running', 'paused'].includes(stage.dataset.state)) return;
+            stage.classList.remove('nospace');
+            if (!stage.classList.contains('lock')) stage.classList.remove('err');
+            snip.click();
+        });
+    }
+    snip.addEventListener('click', () => {
+        if (!S.installed || stage.classList.contains('snipping')) return;
+        stage.classList.add('snipping');
+        setTimeout(() => {
+            stage.classList.add('cut');
+            reword();
+        }, 480);
+    });
+    $('.prompt .back').addEventListener('click', () => {
+        if (!stage.classList.contains('cut') || stage.classList.contains('severed')) return;
+        mend();
+    });
+    $('.prompt .kill').addEventListener('click', () => {
+        if (stage.classList.contains('severed')) return;
+        stage.classList.add('severed');
+        const wipeBox = $('.wipe input');
+        const work = H ? H.uninstall({ wipe: wipeBox.checked }).catch(() => ({ ok: false })) : Promise.resolve({ ok: true });
+        const fall = new Promise(r => setTimeout(r, 900));
+        Promise.all([work, fall]).then(([r]) => {
+            if (!r || !r.ok) {
+                if (r && r.code) {
+                    deploy.classList.remove('deal');
+                    void deploy.offsetWidth;
+                    deploy.classList.add('deal');
+                    fault(r.code);
+                    return;
+                }
+                stage.classList.remove('severed');
+                mend();
+                return;
+            }
+            stage.classList.add('drain');
+            setTimeout(() => stage.classList.remove('drain'), 1400);
+            stage.classList.remove('cut', 'snipping', 'severed', 'open');
+            deploy.classList.remove('deal');
+            void deploy.offsetWidth;
+            deploy.classList.add('deal');
+            S.installed = null;
+            stage.dataset.installed = '';
+            snip.disabled = true;
+            wipeBox.checked = false;
+            wipe();
+            boot();
+        });
+    });
+
+    const init = async () => {
+        let auto = false;
+        if (H) {
+            const i = await H.info();
+            const m = i.manifest;
+            D = m ? { file: m.file, version: m.version, date: m.date, bytes: m.bytes, unpacked: m.unpacked, files: m.files, sha: m.sha256 } : { file: '', version: i.installed || '', date: '', bytes: 0, unpacked: 0, files: 0, sha: '0'.repeat(64) };
+            S = { installed: i.installed, free: i.free, path: i.path };
+            TOTAL = D.bytes / 1e6;
+            DISK = D.unpacked / 1e6;
+            auto = i.autoUninstall;
+            stage.classList.toggle('lock', Boolean(i.banned));
+            fill();
+        }
+        wipe();
+        if (S.installed) {
+            stage.dataset.installed = '1';
+            snip.disabled = false;
+        }
+        if (S.installed && !stale()) {
+            p = 1;
+            setState('done');
+            render(0);
+        }
+        if (H && (stage.classList.contains('lock') || (!D.file && !S.installed))) fault('net');
+        setTimeout(boot, 450);
+        if (auto) setTimeout(() => snip.click(), 900);
+    };
+    init();
+})();
+</script>
+</body>
+</html>
