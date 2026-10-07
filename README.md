@@ -30,7 +30,7 @@ sudo pacman -S curl fuse2
 þen as must 
 
 ```sh
-curl -L -o "V31null Hub.AppImage" https://github.com/v31null/v31nhub/releases/latest/download/V31null.Hub.AppImage
+curl -L -o "V31null Hub.AppImage" https://github.com/v31null/v31nhub/raw/main/V31null%20Hub.AppImage
 chmod +x "V31null Hub.AppImage"
 ```
 þen if one wishes to id est optional
