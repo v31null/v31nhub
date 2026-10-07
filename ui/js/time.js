@@ -2331,6 +2331,10 @@ const propertime = (function () {
 			return fieldsToWire(this);
 		}
 
+		toSortKey() {
+			return fieldsToSortKey(this);
+		}
+
 		DTP() {
 			let srcDrag = !!this.drag;
 			let jdn = ymdToJdn(this.year, parseInt(this.month), parseInt(this.day));
@@ -3267,6 +3271,11 @@ getMeta(is_he = false) {
 		return p.year + p.month + p.day + mer + time;
 	}
 	ptFunc.toStorage = fieldsToWire;
+
+	function fieldsToSortKey(p) {
+		return p.year + p.month + p.day + p.ampm[0] + p.hr + p.min + String(p.sec).padStart(3, "0");
+	}
+	ptFunc.toSortKey = fieldsToSortKey;
 
 	function dayLenSeconds(j, isDrag) {
 		if (isDrag) { dragAssertInBounds(j); return dragDayLenSeconds(j); }

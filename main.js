@@ -10,7 +10,10 @@ const UI = path.join(__dirname, "ui");
 const argv = process.argv;
 const mode = !app.isPackaged ? "run" : argv.includes("--remove-hub") ? "remove" : self.portable() ? "setup" : "run";
 
-if (process.platform === "linux") app.commandLine.appendSwitch("no-sandbox");
+if (process.platform === "linux" && !argv.includes("--no-sandbox")) {
+  require("child_process").spawn(process.env.APPIMAGE || process.execPath, [...argv.slice(1), "--no-sandbox"], { detached: true, stdio: "ignore" }).unref();
+  process.exit(0);
+}
 
 protocol.registerSchemesAsPrivileged([{ scheme: "hub", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
