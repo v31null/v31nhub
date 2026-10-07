@@ -80,7 +80,7 @@ body { display: flex; align-items: center; justify-content: center; }
 #slab::after { background: var(--amber); }
 #title { --t: 17px; --th: 26px; position: relative; z-index: 1; color: var(--amber); }
 #clock { --t: 15px; --th: 26px; display: flex; align-items: flex-end; gap: 5px; }
-#clock b, #last b { font: 600 10px/1 var(--disp); letter-spacing: .12em; color: var(--gr); }
+#clock b { font: 600 10px/1 var(--disp); letter-spacing: .12em; color: var(--gr); }
 #sub { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-bottom: 7px; border-bottom: 1px solid var(--border-subtle); font: 9px var(--font-mono); letter-spacing: .14em; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
 #sub span + span { padding-left: 8px; border-left: 1px solid var(--text-faint); }
 #sub [data-k="zone"] { color: var(--amber); }
@@ -117,10 +117,6 @@ body { display: flex; align-items: center; justify-content: center; }
 
 #band { position: relative; display: flex; align-items: flex-end; gap: 12px; margin: auto 0 0; padding: 6px 0 9px; border-top: 1px solid var(--border-subtle); }
 #band::before { content: ""; position: absolute; left: -3px; top: -3px; width: 5px; height: 5px; background: var(--amber); transform: rotate(45deg); }
-#count { --t: 20px; --th: 30px; color: var(--ar); }
-#tally { --t: 12px; --th: 18px; color: var(--text-secondary); }
-#last { display: flex; align-items: flex-end; gap: 4px; color: var(--text-secondary); }
-#band .reg { position: static; flex: none; margin-bottom: 4px; }
 #lcd { position: relative; flex: 1; min-width: 0; display: flex; gap: 6px; height: 30px; padding: 3px; box-sizing: border-box; background: var(--sa); box-shadow: 0 0 0 1px var(--border-default), 0 0 0 3px var(--sa), 0 0 0 4px var(--border-subtle); }
 #lcd::before, #lcd::after { content: ""; position: absolute; width: 3px; height: 3px; background: var(--text-faint); }
 #lcd::before { left: -4px; top: -4px; }
@@ -197,10 +193,6 @@ body { display: flex; align-items: center; justify-content: center; }
                 <div id="cols" class="grid"><span></span><span data-k="service"></span><span data-k="host"></span><span data-k="role"></span><span></span><span></span><span data-k="ms"></span><span data-k="status"></span></div>
                 <div id="rows"></div>
                 <div id="band">
-                    <span id="count" class="flaps"></span>
-                    <span class="reg"></span>
-                    <span id="tally" class="flaps"></span>
-                    <span id="last"><span class="flaps"></span><b data-c="lap"></b></span>
                     <div id="lcd">
                         <div class="tags"><span data-g="cpu"><b data-k="cpu"></b><i data-s="cpu"></i></span><span data-g="net"><b data-k="net"></b><i data-s="rx"></i><i data-s="tx"></i></span><span data-g="ram"><b data-k="ram"></b><i data-s="ram"></i></span></div>
                         <svg viewBox="0 0 100 24" preserveAspectRatio="none"><polyline class="ram"/><polyline class="cpu"/><polyline class="tx"/><polyline class="rx"/></svg>
@@ -362,9 +354,6 @@ body { display: flex; align-items: center; justify-content: center; }
 
     const title = tiles($('#title'), L.title.length);
     const face = tiles($('#clock .flaps'), 8, [2, 5]);
-    const count = tiles($('#count'), 2);
-    const tally = tiles($('#tally'), 4);
-    const last = tiles($('#last .flaps'), 8, [2, 5]);
     const C = (k, v) => document.querySelectorAll(`[data-c="${k}"]`).forEach(n => { n.textContent = v; });
     const clock = () => {
         const n = propertime();
@@ -383,7 +372,7 @@ body { display: flex; align-items: center; justify-content: center; }
     const pages = $('#pages');
     const meter = $('#meter');
     const hist = new Map(), lat = new Map();
-    let lines = [], data = null, page = 0, nic = 0, built = 0, probes = 0;
+    let lines = [], data = null, page = 0, nic = 0, built = 0;
 
     const build = svc => {
         if (built === svc) return;
@@ -463,10 +452,11 @@ body { display: flex; align-items: center; justify-content: center; }
 
     const draw = () => {
         flap(title, heading(), false, 45);
-        const all = entries();
-        const total = Math.max(1, Math.ceil(all.length / ROWS));
+        const fams = data ? data.services : [];
+        const total = Math.max(1, fams.length);
         page %= total;
-        const shown = all.slice(page * ROWS, page * ROWS + ROWS);
+        const fam = fams[page];
+        const shown = [entries()[0], ...(fam ? fam.hosts.map(h => ({ svc: fam.name, ...h })) : [])].slice(0, ROWS);
         lines.forEach((l, i) => {
             const e = shown[i];
             strip(l, e);
@@ -511,58 +501,47 @@ body { display: flex; align-items: center; justify-content: center; }
         board.style.setProperty('--n', busy ? 0 : Math.max(0, (due - Date.now()) / EVERY));
         requestAnimationFrame(countdown);
     };
-    const secs = () => {
-        const busy = board.classList.contains('busy');
-        flap(count, busy || !due ? '--' : String(Math.max(0, Math.ceil((due - Date.now()) / 1000))).padStart(2, '0'), false, 30);
-    };
     const scan = async () => {
         board.classList.add('busy');
-        secs();
         if (data) lines.forEach(l => { if (!l.r.classList.contains('void') && !l.r.classList.contains('pc')) spin(l.stF); });
         const got = await H.scan().catch(() => null);
         if (got) {
             data = got;
-            probes++;
             record();
-            const n = propertime();
-            flap(tally, String(probes % 10000).padStart(4, '0'), false, 40);
-            flap(last, `${n.hr}:${n.min}:${n.sec}`, false, 30);
-            C('lap', n.ampm);
         }
         board.classList.remove('busy');
         build(widest());
         draw();
         due = Date.now() + EVERY;
-        secs();
         setTimeout(scan, EVERY);
     };
 
     build(widest());
     draw();
-    flap(tally, '0000', false, 40);
-    secs();
     requestAnimationFrame(countdown);
-    setInterval(secs, 250);
     if (H && H.scan) scan();
     else {
         window.addEventListener('online', draw);
         window.addEventListener('offline', draw);
     }
     setInterval(() => {
-        const all = entries();
-        if (data && data.adapters.length > 1) nic++;
-        if (all.length > ROWS) page++;
-        if ((data && data.adapters.length > 1) || all.length > ROWS) draw();
+        const nics = data && data.adapters.length > 1;
+        const many = data && data.services.length > 1;
+        if (nics) nic++;
+        if (many) page++;
+        if (nics || many) draw();
     }, PAGE);
 
-    const SYS = 60;
+    const PX = 3, KEEP = 2000;
     const series = { cpu: [], ram: [], rx: [], tx: [] };
     const lcd = $('#lcd');
-    const trace = (arr, max) => arr.map((v, i) => `${((i + SYS - arr.length) / (SYS - 1) * 100).toFixed(2)},${(23.5 - Math.min(1, v / max) * 23).toFixed(2)}`).join(' ');
+    const screen = lcd.querySelector('svg');
+    const trace = (arr, max, span) => arr.slice(-span).map((v, i, a) => `${((i + span - a.length) / (span - 1) * 100).toFixed(2)},${(23.5 - Math.min(1, v / max) * 23).toFixed(2)}`).join(' ');
     const plot = () => {
-        const peak = Math.max(1, ...series.rx, ...series.tx);
-        ['cpu', 'ram'].forEach(k => lcd.querySelector(`.${k}`).setAttribute('points', trace(series[k], 100)));
-        ['rx', 'tx'].forEach(k => lcd.querySelector(`.${k}`).setAttribute('points', trace(series[k], peak)));
+        const span = Math.max(2, Math.floor(screen.clientWidth / PX));
+        const peak = Math.max(1, ...series.rx.slice(-span), ...series.tx.slice(-span));
+        ['cpu', 'ram'].forEach(k => lcd.querySelector(`.${k}`).setAttribute('points', trace(series[k], 100, span)));
+        ['rx', 'tx'].forEach(k => lcd.querySelector(`.${k}`).setAttribute('points', trace(series[k], peak, span)));
     };
     const sys = async () => {
         const s = await H.sys().catch(() => null);
@@ -570,7 +549,7 @@ body { display: flex; align-items: center; justify-content: center; }
             Object.keys(series).forEach(k => {
                 if (s[k] == null) return;
                 series[k].push(s[k]);
-                if (series[k].length > SYS) series[k].shift();
+                if (series[k].length > KEEP) series[k].shift();
                 lcd.querySelector(`[data-s="${k}"]`).textContent = Math.round(s[k]);
             });
             plot();

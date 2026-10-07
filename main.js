@@ -71,7 +71,7 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
 
     const [{ live, report }, fresh] = await Promise.all([link.probe(), app.isPackaged ? self.check() : null]);
     if (app.isPackaged) {
-      self.tidy();
+      await self.tidy();
       if (await self.update({ fresh, argv })) return app.quit();
     }
 

@@ -175,16 +175,20 @@ const update = async ({ fresh, argv }) => {
       if (!res.ok) throw new Error("http");
       const hash = crypto.createHash("sha256");
       const out = fs.createWriteStream(next);
+      let broke = null;
+      out.on("error", e => (broke = e));
       let got = 0;
       try {
         for await (const chunk of res.body) {
+          if (broke) throw broke;
           hash.update(chunk);
           got += chunk.length;
-          if (!out.write(chunk)) await once(out, "drain");
+          if (!out.write(chunk) && !out.destroyed) await once(out, "drain");
         }
       } finally {
-        await new Promise(r => out.end(r));
+        if (!out.destroyed) await new Promise(r => out.end(r));
       }
+      if (broke) throw broke;
       if (got !== h.bytes || hash.digest("hex") !== h.sha256.toLowerCase()) throw new Error("hash");
     } catch (e) {
       await fsp.rm(next, { force: true }).catch(() => {});

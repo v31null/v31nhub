@@ -68,6 +68,106 @@ const get = async url => {
   }
 };
 
+const socketed = name => (list().socket || []).includes(name);
+
+const knock = async url => {
+  const t = performance.now();
+  try {
+    await fetch(url, { method: "HEAD", cache: "no-store", headers: GATE, signal: AbortSignal.timeout(WAIT) });
+    return Math.round(performance.now() - t);
+  } catch (e) {
+    return null;
+  }
+};
+
+const ping = async url => {
+  const a = await knock(url);
+  const b = await knock(url);
+  const got = [a, b].filter(v => v != null);
+  return got.length ? Math.min(...got) : null;
+};
+
+const sockets = new Map();
+
+const drop = (base, c) => {
+  if (sockets.get(base) === c) sockets.delete(base);
+  try {
+    c.ws.close();
+  } catch (e) {}
+  c.acks.forEach(done => done(false));
+  c.acks.clear();
+};
+
+const link = base => {
+  const have = sockets.get(base);
+  if (have) return have.ready;
+  const c = { ws: null, acks: new Map(), id: 0 };
+  sockets.set(base, c);
+  c.ready = new Promise(res => {
+    try {
+      c.ws = new WebSocket(`${base.replace(/^http/i, "ws")}/socket.io/?EIO=4&transport=websocket`, { headers: { Origin: base } });
+    } catch (e) {
+      sockets.delete(base);
+      return res(null);
+    }
+    const timer = setTimeout(() => {
+      drop(base, c);
+      res(null);
+    }, WAIT);
+    c.ws.onmessage = m => {
+      const d = String(m.data);
+      if (d === "2") return c.ws.send("3");
+      if (d.startsWith("40")) {
+        clearTimeout(timer);
+        return res(c);
+      }
+      if (d.startsWith("43")) {
+        const id = /^43(\d+)/.exec(d);
+        const done = id && c.acks.get(Number(id[1]));
+        if (done) done(true);
+        return;
+      }
+      if (d.startsWith("41") || d.startsWith("44")) {
+        clearTimeout(timer);
+        drop(base, c);
+        return res(null);
+      }
+      if (d.startsWith("0")) c.ws.send("40");
+    };
+    c.ws.onerror = () => {};
+    c.ws.onclose = () => {
+      clearTimeout(timer);
+      drop(base, c);
+      res(null);
+    };
+  });
+  return c.ready;
+};
+
+const rtt = async base => {
+  const c = await link(base);
+  if (!c) return null;
+  const id = c.id++;
+  const t = performance.now();
+  return new Promise(res => {
+    const timer = setTimeout(() => {
+      c.acks.delete(id);
+      drop(base, c);
+      res(null);
+    }, WAIT);
+    c.acks.set(id, ok => {
+      clearTimeout(timer);
+      c.acks.delete(id);
+      res(ok ? Math.round(performance.now() - t) : null);
+    });
+    try {
+      c.ws.send(`42${id}["rtt"]`);
+    } catch (e) {
+      c.acks.get(id)(false);
+    }
+  });
+};
+
 const adapters = () =>
   Object.entries(os.networkInterfaces()).flatMap(([name, all]) =>
     (all || []).filter(a => !a.internal && (a.family === "IPv4" || a.family === 4)).map(a => ({ name, address: a.address }))
@@ -80,8 +180,11 @@ const scan = async () => {
       name: s.name,
       hosts: await Promise.all(
         s.hosts.map(async h => {
-          const manifest = await get(`${h.url}/app/manifest.json`);
-          return { url: h.url, host: new URL(h.url).host, role: h.role, manifest };
+          const at = `${h.url}/app/manifest.json`;
+          const live = socketed(s.name);
+          const [manifest, wsMs] = await Promise.all([get(at), live ? rtt(h.url) : null]);
+          const ms = live ? wsMs : manifest.status === "online" ? await ping(at) : null;
+          return { url: h.url, host: new URL(h.url).host, role: h.role, manifest, ms };
         })
       )
     }))
@@ -91,7 +194,7 @@ const scan = async () => {
     adapters: adapters(),
     services: rows.map(s => ({
       name: s.name,
-      hosts: s.hosts.map(h => ({ host: h.host, role: h.role, status: h.manifest.status, code: h.manifest.code || null, ms: h.manifest.ms })),
+      hosts: s.hosts.map(h => ({ host: h.host, role: h.role, status: h.manifest.status, code: h.manifest.code || null, ms: h.ms })),
       raw: s.hosts
     }))
   };

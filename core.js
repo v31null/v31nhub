@@ -503,7 +503,7 @@ module.exports = function core({ win, mirrors, offline, argv }) {
     if (banned) return false;
     const o = await own();
     if (!o) return false;
-    const child = spawn(path.join(o.path, EXE), [], { cwd: o.path, stdio: "ignore" });
+    const child = spawn(path.join(o.path, EXE), bases[0] ? [`--prono-host=${bases[0]}`] : [], { cwd: o.path, stdio: "ignore" });
     const back = () => {
       if (win.isDestroyed()) return;
       win.show();
