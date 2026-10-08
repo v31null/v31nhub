@@ -22,6 +22,11 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
 } else {
   let win = null;
   let ask = null;
+  let quitting = false;
+
+  app.on("before-quit", () => {
+    quitting = true;
+  });
 
   app.on("second-instance", (e, args) => {
     const w = [win, ask].find(x => x && !x.isDestroyed());
@@ -190,7 +195,7 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
     }
 
     win = open("", 900, 560);
-    core({
+    const hub = core({
       win,
       argv,
       apps: {
@@ -198,6 +203,11 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
         m2: { mirrors: link.order(musik && musik.base, "nullpunkts"), offline: !musik },
         arc: { mirrors: link.order(musik && musik.base, "nullpunkts"), offline: !musik }
       }
+    });
+    win.on("close", e => {
+      if (quitting || !hub.busy()) return;
+      e.preventDefault();
+      win.hide();
     });
     if (ask && !ask.isDestroyed()) ask.destroy();
     ask = null;

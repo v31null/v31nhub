@@ -2,13 +2,20 @@ const fs = require("fs");
 const fsp = fs.promises;
 const path = require("path");
 const crypto = require("crypto");
+const zlib = require("zlib");
 const { once } = require("events");
 const { app } = require("electron");
 const { GATE } = require("./net.js");
 
 const SAMPLE = 65536;
+const PACK = "/m/m2.v31np";
+const MAGIC = Buffer.from("V31NSPACKFORMAT");
+const PI = Buffer.from("243F6A8885A308D313198A2E", "hex");
+const PHI = Buffer.from("9E3779B97F4A7C15F39CC060", "hex");
+const LIMIT = 2 ** 52;
 const TYPES = {
   mp3: "audio/mpeg",
+  wav: "audio/x-wav",
   mp4: "video/mp4",
   webm: "video/webm",
   png: "image/png",
@@ -45,6 +52,39 @@ const print = async (file, key, mime) => {
 
 const fail = code => Object.assign(new Error(code), { hub: code });
 
+const rows = buf => {
+  const out = [];
+  let row = null, from = 0;
+  for (;;) {
+    const hit = buf.indexOf(PHI, from);
+    const end = hit < 0 ? buf.length : hit - 1;
+    if (row) row.push(buf.subarray(from, end));
+    else if (end !== 0) return null;
+    if (hit < 0) return out;
+    if (hit < 1) return null;
+    if (buf[hit - 1] === 0) out.push((row = []));
+    else if (buf[hit - 1] !== 1 || !row) return null;
+    from = hit + PHI.length;
+  }
+};
+
+const num = b => {
+  if (!b.length || b.length > 7) return null;
+  const wide = Buffer.alloc(8);
+  b.copy(wide);
+  const n = wide.readUInt32LE(4) * 2 ** 32 + wide.readUInt32LE(0);
+  return n < LIMIT ? n : null;
+};
+
+const crcOf = async (file, crc) => {
+  try {
+    for await (const chunk of fs.createReadStream(file)) crc = zlib.crc32(chunk, crc);
+    return crc;
+  } catch (e) {
+    throw fail("fail");
+  }
+};
+
 const throttle = () => {
   let t = 0;
   return fn => {
@@ -59,6 +99,7 @@ const throttle = () => {
 module.exports = ({ win, mirrors, offline }) => {
   const dir = path.join(app.getPath("appData"), "M2", "Archive");
   const indexFile = path.join(dir, "index.json");
+  const stateFile = path.join(dir, "m2.v31np");
 
   const send = (channel, msg) => {
     if (win && !win.isDestroyed()) win.webContents.send(channel, { ...msg, app: "arc" });
@@ -166,11 +207,154 @@ module.exports = ({ win, mirrors, offline }) => {
     }
   };
 
+  const header = async (url, signal, list) => {
+    const most = MAGIC.length + 3 * PI.length + Object.keys(list).reduce((n, k) => n + 105 + 5 * Buffer.byteLength(k), 0);
+    const res = await fetch(url, { headers: GATE, signal });
+    if (!res.ok) throw new Error("http");
+    let buf = Buffer.alloc(0);
+    for await (const chunk of res.body) {
+      buf = Buffer.concat([buf, chunk]);
+      if (!buf.subarray(0, MAGIC.length).equals(MAGIC.subarray(0, Math.min(buf.length, MAGIC.length)))) throw fail("fail");
+      const a = MAGIC.length;
+      if (buf.length >= a + PI.length && !buf.subarray(a, a + PI.length).equals(PI)) throw fail("fail");
+      const b = buf.length >= a + PI.length ? buf.indexOf(PI, a + PI.length) : -1;
+      const c = b < 0 ? -1 : buf.indexOf(PI, b + PI.length);
+      if (c >= 0) return buf.subarray(0, c + PI.length);
+      if (buf.length > most) throw fail("fail");
+    }
+    throw fail("fail");
+  };
+
+  const parse = (head, total, list) => {
+    const a = MAGIC.length + PI.length;
+    const b = head.indexOf(PI, a), c = head.indexOf(PI, b + PI.length);
+    const t1 = rows(head.subarray(a, b)), t2 = rows(head.subarray(b + PI.length, c));
+    if (!t1 || !t2 || t1.length !== t2.length) return null;
+    const sizes = new Map();
+    for (const r of t2) {
+      if (r.length !== 5) return null;
+      const key = r[0].toString(), size = num(r[1]);
+      if (size === null || sizes.has(key) || !Buffer.concat([r[2], r[3], r[4]]).equals(r[0])) return null;
+      sizes.set(key, size);
+    }
+    const files = [];
+    let next = c + PI.length;
+    for (const r of t1) {
+      if (r.length !== 2) return null;
+      const key = r[0].toString(), at = num(r[1]);
+      if (at !== next || !sizes.has(key) || !Object.hasOwn(list, key) || !where(key)) return null;
+      files.push({ key, at, size: sizes.get(key) });
+      next = at + sizes.get(key);
+      sizes.delete(key);
+    }
+    return next === total - 16 ? { files, end: next } : null;
+  };
+
+  const pack = async ({ l, done, record, drop, bytes }) => {
+    let at = 0, absent = 0;
+    for (;;) {
+      await gate();
+      job.ctl = new AbortController();
+      const signal = job.ctl.signal;
+      const w = { out: null };
+      try {
+        const url = `${mirrors[at]}${PACK}`;
+        const tail = await fetch(url, { headers: { ...GATE, Range: "bytes=-16" }, signal });
+        if (tail.status === 404) throw Object.assign(new Error("absent"), { absent: true });
+        if (tail.status !== 206) throw new Error("http");
+        const total = Number(String(tail.headers.get("content-range") || "").split("/")[1]);
+        const foot = Buffer.from(await tail.arrayBuffer());
+        if (!Number.isSafeInteger(total) || total >= LIMIT || foot.length !== 16 || !foot.subarray(0, PI.length).equals(PI)) throw fail("fail");
+        const head = await header(url, signal, l.list);
+        const b = parse(head, total, l.list);
+        if (!b) throw fail("fail");
+        const state = Buffer.concat([head, foot]);
+        const saved = await fsp.readFile(stateFile).catch(() => null);
+        if (!saved || !saved.equals(state)) {
+          await drop(b.files.map(f => f.key));
+          await fsp.mkdir(dir, { recursive: true });
+          const tmp = `${stateFile}.${process.pid}.tmp`;
+          await fsp.writeFile(tmp, state);
+          await fsp.rename(tmp, stateFile);
+        }
+        let i = b.files.findIndex(f => !done.has(f.key));
+        if (i < 0) i = b.files.length;
+        let crc = zlib.crc32(head);
+        for (const f of b.files.slice(0, i)) crc = await crcOf(where(f.key), crc);
+        let pos = i < b.files.length ? b.files[i].at : b.end;
+        if (pos < b.end) {
+          const res = await fetch(url, { headers: { ...GATE, Range: `bytes=${pos}-${b.end - 1}` }, signal });
+          if (res.status !== 206 || !String(res.headers.get("content-range") || "").startsWith(`bytes ${pos}-`)) throw new Error("http");
+          const close = async () => {
+            const f = b.files[i++];
+            if (!w.out) return;
+            const out = w.out;
+            w.out = null;
+            await new Promise(r => out.end(r));
+            const file = where(f.key), part = `${file}.part`, mime = mimeOf(f.key, "");
+            const got = await print(part, f.key, mime);
+            if (got.fp !== l.list[f.key]) return fsp.rm(part, { force: true });
+            await fsp.rm(file, { force: true });
+            await fsp.rename(part, file);
+            await record(f.key, { fp: got.fp, size: got.size, mime });
+          };
+          const open = async () => {
+            while (i < b.files.length) {
+              const f = b.files[i];
+              if (!done.has(f.key)) {
+                const file = where(f.key);
+                await fsp.mkdir(path.dirname(file), { recursive: true });
+                w.out = fs.createWriteStream(`${file}.part`);
+              }
+              if (f.size > 0) return;
+              await close();
+            }
+          };
+          await open();
+          for await (const piece of res.body) {
+            const chunk = Buffer.from(piece.buffer, piece.byteOffset, piece.byteLength);
+            crc = zlib.crc32(chunk, crc);
+            let o = 0;
+            while (o < chunk.length) {
+              if (i >= b.files.length) throw fail("fail");
+              const f = b.files[i], take = Math.min(chunk.length - o, f.at + f.size - pos);
+              if (w.out && !w.out.write(chunk.subarray(o, o + take))) await once(w.out, "drain");
+              o += take;
+              pos += take;
+              bytes(take);
+              if (pos === f.at + f.size) {
+                await close();
+                await open();
+              }
+            }
+          }
+          if (pos !== b.end) throw new Error("short");
+        }
+        if (zlib.crc32(PI, crc) !== foot.readUInt32LE(PI.length)) {
+          await drop(b.files.map(f => f.key));
+          throw fail("hash");
+        }
+        return true;
+      } catch (e) {
+        if (w.out) await new Promise(r => w.out.end(r));
+        if (e.hub) throw e;
+        if (job.cancelled) throw e;
+        if (job.paused) continue;
+        if (e.absent) absent++;
+        if (++at >= mirrors.length) {
+          if (absent === mirrors.length) return false;
+          throw fail("net");
+        }
+      }
+    }
+  };
+
   const run = async () => {
     const l = await list();
     if (!l) throw fail("net");
     const keys = Object.keys(l.list);
     const have = readIndex();
+    const fresh = fs.existsSync(stateFile) || !Object.keys(have.files).length;
     if (have.v !== l.v || !have.complete) await writeIndex({ v: l.v, complete: false });
     const tick = throttle();
     const todo = [];
@@ -197,25 +381,49 @@ module.exports = ({ win, mirrors, offline }) => {
     send("hub:progress", { phase: "verify", frac: 1, speed: 0 });
 
     let mark = Date.now(), moved = 0, speed = 0, batch = {};
-    for (let j = 0; j < todo.length; j++) {
-      const key = todo[j];
-      const show = () => send("hub:progress", { phase: "fetch", frac: (j + 1) / todo.length, speed });
-      batch[key] = await fetchOne(key, l.list[key], n => {
-        moved += n;
-        tick(() => {
-          const now = Date.now();
-          speed = (moved / Math.max(now - mark, 1)) * 1000 / 1e6;
-          mark = now;
-          moved = 0;
-          show();
-        });
+    const done = new Set(Object.keys(keep));
+    const base = done.size;
+    const show = extra => send("hub:progress", { phase: "fetch", frac: Math.min(1, Math.max(0, done.size - base + extra) / Math.max(todo.length, 1)), speed });
+    const bytes = extra => n => {
+      moved += n;
+      tick(() => {
+        const now = Date.now();
+        speed = (moved / Math.max(now - mark, 1)) * 1000 / 1e6;
+        mark = now;
+        moved = 0;
+        show(extra);
       });
-      if (Object.keys(batch).length >= 25) {
-        await writeIndex({ files: batch });
-        batch = {};
-      }
-      show();
+    };
+    const flush = async () => {
+      if (!Object.keys(batch).length) return;
+      await writeIndex({ files: batch });
+      batch = {};
+    };
+    if (fresh) {
+      await pack({
+        l,
+        done,
+        bytes: bytes(0),
+        record: async (key, ent) => {
+          batch[key] = ent;
+          done.add(key);
+          if (Object.keys(batch).length >= 25) await flush();
+          show(0);
+        },
+        drop: async names => {
+          await flush();
+          names.forEach(k => done.delete(k));
+          await writeIndex({}, names);
+        }
+      });
     }
+    for (const key of keys.filter(k => !done.has(k))) {
+      batch[key] = await fetchOne(key, l.list[key], bytes(1));
+      done.add(key);
+      if (Object.keys(batch).length >= 25) await flush();
+      show(0);
+    }
+    await fsp.rm(stateFile, { force: true });
     await writeIndex({ v: l.v, complete: true, files: batch });
     send("hub:progress", { phase: "fetch", frac: 1, speed: 0 });
   };

@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld("hub", {
   minimize: () => ipcRenderer.invoke("hub:min"),
   close: () => ipcRenderer.invoke("hub:close"),
   drag: on => ipcRenderer.send("hub:drag", on),
-  launch: key => ipcRenderer.invoke("hub:launch", key),
+  launch: (key, stay) => ipcRenderer.invoke("hub:launch", key, stay),
   proceed: () => ipcRenderer.invoke("hub:proceed"),
   quit: () => ipcRenderer.invoke("hub:quit"),
   scan: () => ipcRenderer.invoke("hub:scan"),

@@ -58,6 +58,8 @@ const plain = async fn => {
 
 const sleep = t => new Promise(r => setTimeout(r, t));
 
+const kids = new Set();
+
 const run = (file, args) => new Promise((res, rej) => execFile(file, args, { windowsHide: true }, e => (e ? rej(e) : res())));
 
 const read = (file, args) => new Promise(res => execFile(file, args, { windowsHide: true, maxBuffer: 1 << 24 }, (e, out) => res(e ? "" : String(out))));
@@ -529,19 +531,21 @@ const unit = (key, { win, mirrors, offline, argv }) => {
       return r;
     },
 
-    launch: async () => {
+    launch: async stay => {
       if (banned) return false;
       const o = await own();
       if (!o) return false;
-      const child = spawn(path.join(o.path, EXE), bases[0] ? [`${spec.flag}${bases[0]}`] : [], { cwd: o.path, stdio: "ignore" });
+      const child = spawn(path.join(o.path, EXE), bases[0] ? [`${spec.flag}${bases[0]}`] : [], { cwd: o.path, stdio: "ignore", detached: true });
+      kids.add(child);
       const back = () => {
+        kids.delete(child);
         if (win.isDestroyed()) return;
         win.show();
         win.focus();
       };
       child.on("error", back);
       child.on("exit", back);
-      win.hide();
+      if (!stay) win.hide();
       return true;
     },
 
@@ -568,4 +572,5 @@ module.exports = function core({ win, apps, argv }) {
   on("hub:uninstall", "uninstall");
   on("hub:launch", "launch");
   on("hub:path", "choosePath");
+  return { busy: () => kids.size > 0 };
 };

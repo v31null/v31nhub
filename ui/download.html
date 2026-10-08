@@ -1569,11 +1569,11 @@ body { display: flex; align-items: center; justify-content: center; }
     };
     stage.querySelector('#space').addEventListener('click', () => stage.classList.remove('nospace'));
 
-    const start = async () => {
+    const start = async stay => {
         const a = A;
         if (a.open || stage.classList.contains('cut') || a.err || (a.fixed && a.p >= 1)) return;
         if (stage.classList.contains('ok') && a.live) {
-            H.launch(a.key);
+            H.launch(a.key, stay);
             return;
         }
         if (a.p >= 1) {
@@ -1608,7 +1608,7 @@ body { display: flex; align-items: center; justify-content: center; }
             stage.classList.remove('err');
             if (A === P) boot();
         }
-        start();
+        start(e.ctrlKey);
     });
     deploy.addEventListener('keydown', e => {
         if (e.target === deploy && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); start(); }
@@ -1624,7 +1624,7 @@ body { display: flex; align-items: center; justify-content: center; }
         if (A.live) H.cancel(A.key);
         halt(A);
     });
-    $('.go').addEventListener('click', () => { if (A.live) H.launch(A.key); });
+    $('.go').addEventListener('click', e => { if (A.live) H.launch(A.key, e.ctrlKey); });
     $('.path button').addEventListener('click', async () => {
         const a = A;
         if (!a.live || a.state !== 'idle') return;
