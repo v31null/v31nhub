@@ -24,6 +24,7 @@
     { "url": "https://raw.githubusercontent.com/v31null/v31nhub/main/hub.json", "exe": "https://github.com/v31null/v31nhub/releases/latest/download/V31null.Hub.exe", "role": "backup", "linux": { "url": "https://raw.githubusercontent.com/v31null/v31nhub/main/hub-linux.json", "exe": "https://github.com/v31null/v31nhub/releases/latest/download/V31null.Hub.AppImage" } }
   ],
   "online": [
-    "prono"
+    "prono",
+    "m2"
   ]
 }

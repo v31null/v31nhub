@@ -11,6 +11,7 @@ const NAME = LINUX ? "V31null Hub.AppImage" : "V31null Hub.exe";
 const { GATE, WAIT, hubs } = require("./net.js");
 const KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\V31null Hub";
 const PRONO = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Prono";
+const M2 = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\M2";
 
 const local = () => process.env.LOCALAPPDATA || app.getPath("appData");
 const home = () => path.join(local(), "Programs", "V31null Hub");
@@ -104,9 +105,11 @@ const register = async () => {
 };
 
 const adopt = async () => {
-  const want = `"${installed()}" --uninstall`;
-  const now = await value(PRONO, "UninstallString");
-  if (now && now !== want) await run("reg.exe", ["add", PRONO, "/v", "UninstallString", "/t", "REG_SZ", "/d", want, "/f"]);
+  for (const [key, flag] of [[PRONO, "--uninstall"], [M2, "--uninstall-m2"]]) {
+    const want = `"${installed()}" ${flag}`;
+    const now = await value(key, "UninstallString");
+    if (now && now !== want) await run("reg.exe", ["add", key, "/v", "UninstallString", "/t", "REG_SZ", "/d", want, "/f"]);
+  }
   await fsp.rm(path.join(local(), "V31null Hub"), { recursive: true, force: true }).catch(() => {});
 };
 

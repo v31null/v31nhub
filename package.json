@@ -1,6 +1,6 @@
 {
   "name": "v31hub",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "private": true,
   "description": "V31null hub",
   "author": "v31null",
@@ -24,6 +24,7 @@
       "main.js",
       "preload.js",
       "core.js",
+      "arc.js",
       "self.js",
       "net.js",
       "sys.js",

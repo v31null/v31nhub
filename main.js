@@ -29,7 +29,9 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
     if (w.isMinimized()) w.restore();
     w.show();
     w.focus();
-    if (w === win && args.includes("--uninstall")) win.webContents.send("hub:ask-uninstall");
+    if (w !== win) return;
+    if (args.includes("--uninstall")) win.webContents.send("hub:ask-uninstall", "prono");
+    else if (args.includes("--uninstall-m2")) win.webContents.send("hub:ask-uninstall", "m2");
   });
 
   const open = (page, width, height) => {
@@ -69,7 +71,7 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
       if (!app.requestSingleInstanceLock()) return app.quit();
     }
 
-    const [{ live, report }, fresh] = await Promise.all([link.probe(), app.isPackaged ? self.check() : null]);
+    const [{ live, musik, report }, fresh] = await Promise.all([link.probe(), app.isPackaged ? self.check() : null]);
     if (app.isPackaged) {
       await self.tidy();
       if (await self.update({ fresh, argv })) return app.quit();
@@ -107,6 +109,7 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
       return r;
     });
     ipcMain.handle("hub:sys", () => gauge.sample());
+    ipcMain.handle("hub:musik", (e, file) => link.musik(file));
     ipcMain.handle("hub:proceed", () => answer && answer(true));
     ipcMain.handle("hub:quit", () => answer && answer(false));
 
@@ -187,7 +190,15 @@ if (mode === "run" && !app.requestSingleInstanceLock()) {
     }
 
     win = open("", 900, 560);
-    core({ win, mirrors: link.order(live && live.base), offline: !live, argv });
+    core({
+      win,
+      argv,
+      apps: {
+        prono: { mirrors: link.order(live && live.base), offline: !live },
+        m2: { mirrors: link.order(musik && musik.base, "nullpunkts"), offline: !musik },
+        arc: { mirrors: link.order(musik && musik.base, "nullpunkts"), offline: !musik }
+      }
+    });
     if (ask && !ask.isDestroyed()) ask.destroy();
     ask = null;
   });

@@ -204,11 +204,25 @@ const report = r => ({ pc: r.pc, adapters: r.adapters, services: r.services.map(
 
 const probe = async () => {
   const r = await scan();
-  const prono = r.services.find(s => s.name === "prono");
-  const hit = prono && prono.raw.find(h => h.manifest.status === "online");
-  return { live: hit ? { base: hit.url } : null, report: report(r) };
+  const up = name => {
+    const s = r.services.find(x => x.name === name);
+    const hit = s && s.raw.find(h => h.manifest.status === "online");
+    return hit ? { base: hit.url } : null;
+  };
+  return { live: up("prono"), musik: up("nullpunkts"), report: report(r) };
 };
 
-const order = first => [...new Set([first, ...servers()].filter(Boolean))];
+const order = (first, name) => [...new Set([first, ...servers(name)].filter(Boolean))];
 
-module.exports = { GATE, WAIT, hubs, servers, needs, probe, scan: async () => report(await scan()), order };
+const MUSIK = ["nd-category-positions.json", "nd-song-durations.json", "m2list.json", "nd-song-categories.json", "nd-category-routes.json"];
+
+const musik = async file => {
+  if (!MUSIK.includes(file)) return null;
+  for (const base of servers("nullpunkts")) {
+    const r = await get(`${base}/m/${file}`);
+    if (r.status === "online") return r.body;
+  }
+  return null;
+};
+
+module.exports = { GATE, WAIT, hubs, servers, needs, probe, scan: async () => report(await scan()), order, musik };
