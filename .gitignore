@@ -1,3 +1,6 @@
 node_modules/
 dist/
+bin/
+obj/
 devtools/
+496133.bin

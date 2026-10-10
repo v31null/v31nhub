@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>V31null Hub</AssemblyName>
+    <RootNamespace>Hub</RootNamespace>
+    <ApplicationIcon>build\icon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <WebView2Dir>$(NuGetPackageRoot)microsoft.web.webview2\1.0.3485.44\</WebView2Dir>
+    <StubExe>obj\stub.exe</StubExe>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3485.44" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net.Http" />
+    <Compile Include="*.cs;shared\*.cs" />
+    <EmbeddedResource Include="ui\**\*" LogicalName="ui/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="net.json" LogicalName="net.json" />
+    <EmbeddedResource Include="package.json" LogicalName="package.json" />
+    <EmbeddedResource Include="build\icon.ico" LogicalName="icon.ico" />
+    <EmbeddedResource Include="$(WebView2Dir)lib\net462\Microsoft.Web.WebView2.Core.dll" LogicalName="Microsoft.Web.WebView2.Core.dll" />
+    <EmbeddedResource Include="$(WebView2Dir)runtimes\win-x64\native\WebView2Loader.dll" LogicalName="WebView2Loader.dll" />
+  </ItemGroup>
+  <Target Name="Stub" BeforeTargets="PrepareForBuild" Inputs="demo\Stub.cs" Outputs="$(StubExe)">
+    <MakeDir Directories="obj" />
+    <Exec Command="&quot;$(MSBuildFrameworkToolsPath64)csc.exe&quot; /nologo /target:winexe /platform:x64 /out:&quot;$(StubExe)&quot; /r:System.Windows.Forms.dll /r:System.Drawing.dll demo\Stub.cs" Condition="Exists('$(MSBuildFrameworkToolsPath64)csc.exe')" />
+    <Exec Command="&quot;$(WINDIR)\Microsoft.NET\Framework64\v4.0.30319\csc.exe&quot; /nologo /target:winexe /platform:x64 /out:&quot;$(StubExe)&quot; /r:System.Windows.Forms.dll /r:System.Drawing.dll demo\Stub.cs" Condition="!Exists('$(MSBuildFrameworkToolsPath64)csc.exe')" />
+  </Target>
+  <ItemGroup>
+    <EmbeddedResource Include="$(StubExe)" LogicalName="stub.exe" />
+  </ItemGroup>
+</Project>

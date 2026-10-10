@@ -18,10 +18,10 @@
     "prono"
   ],
   "hub": [
-    { "url": "https://prono.v31null.de/app/hub.json", "exe": "https://prono.v31null.de/app/V31null%20Hub.exe", "role": "primary", "linux": { "url": "https://prono.v31null.de/app/hub-linux.json", "exe": "https://prono.v31null.de/app/V31null%20Hub.AppImage" } },
-    { "url": "https://prono.saturngruppe.de/app/hub.json", "exe": "https://prono.saturngruppe.de/app/V31null%20Hub.exe", "role": "backup", "linux": { "url": "https://prono.saturngruppe.de/app/hub-linux.json", "exe": "https://prono.saturngruppe.de/app/V31null%20Hub.AppImage" } },
-    { "url": "https://prono.share.zrok.io/app/hub.json", "exe": "https://prono.share.zrok.io/app/V31null%20Hub.exe", "role": "backup", "linux": { "url": "https://prono.share.zrok.io/app/hub-linux.json", "exe": "https://prono.share.zrok.io/app/V31null%20Hub.AppImage" } },
-    { "url": "https://raw.githubusercontent.com/v31null/v31nhub/main/hub.json", "exe": "https://github.com/v31null/v31nhub/releases/latest/download/V31null.Hub.exe", "role": "backup", "linux": { "url": "https://raw.githubusercontent.com/v31null/v31nhub/main/hub-linux.json", "exe": "https://github.com/v31null/v31nhub/releases/latest/download/V31null.Hub.AppImage" } }
+    { "url": "https://prono.v31null.de/app/hub.json", "exe": "https://prono.v31null.de/app/V31null%20Hub.exe", "role": "primary" },
+    { "url": "https://prono.saturngruppe.de/app/hub.json", "exe": "https://prono.saturngruppe.de/app/V31null%20Hub.exe", "role": "backup" },
+    { "url": "https://prono.share.zrok.io/app/hub.json", "exe": "https://prono.share.zrok.io/app/V31null%20Hub.exe", "role": "backup" },
+    { "url": "https://raw.githubusercontent.com/v31null/v31nhub/main/hub.json", "exe": "https://github.com/v31null/v31nhub/releases/latest/download/V31null.Hub.exe", "role": "backup" }
   ],
   "online": [
     "prono",
